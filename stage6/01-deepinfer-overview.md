@@ -1,9 +1,9 @@
-# 6.1 DeepInfer 导读：DeepSeek 的生产推理引擎
+# 6.1 DeepInfer 导读
 
-> 📎 书外内容 ｜ 仓库：[deepseek-ai/DeepInfer](https://github.com/deepseek-ai/DeepInfer) ｜ 开源时间：2026-10-20 ｜ 协议：Apache-2.0
+> 书外内容 ｜ 仓库：[deepseek-ai/DeepInfer](https://github.com/deepseek-ai/DeepInfer) ｜ 开源时间：2026-10-20 ｜ 协议：Apache-2.0
 
 > [!NOTE]
-> 本节状态：⬜ 未开始 ｜ 预计用时：__ h ｜ 完成日期：____
+> 状态：未开始 ｜ 预计用时：__ h ｜ 完成日期：____
 
 ## 它是什么
 
@@ -18,7 +18,7 @@ README 的定位是 DeepSeek 大规模线上服务所用的推理框架。这次
 | 基准 | Prefill 在 4 张 SM100 上测，Decode 在 64 张上测，各自都在一个 scale-up 域内；复现脚本 `examples/sweep/run_sweep.sh` |
 
 > [!WARNING]
-> 手上如果只有 A100/A800/H100/4090 这类卡，跑不起来。这一节的重点是读懂设计，阶段 ⑥ 的其他小节再把思路移植到能跑的环境里。
+> 手上如果只有 A100/A800/H100/4090 这类卡，跑不起来。这一节的重点是读懂设计，第 6 部分 的其他小节再把思路移植到能跑的环境里。
 
 ## 值得重点看的五个机制
 
@@ -54,7 +54,7 @@ README 写明以下内容不在本次发布范围内：
 
 每一步都记一句：**这里和 vLLM 的做法有什么不同，为什么。**
 
-## 🔬 动手实验
+## 动手实验
 
 | 实验 | 在哪做 |
 |---|---|
@@ -62,18 +62,18 @@ README 写明以下内容不在本次发布范围内：
 | 在 vLLM 上开启 async scheduling，对比小模型高并发下的 TPOT | 自己的 GPU |
 | 用 `run_sweep.sh` 的参数组合，在 vLLM 上做同样的 prefill / decode 帕累托扫描 | 自己的 GPU |
 
-## ❓ 自测题
+## 自测题
 
 1. 为什么只支持一个模型的框架反而更容易做到极致性能？代价是什么？
 2. SWA bounded replay 为什么要求保留长度覆盖"窗口 + 最大回溯长度"？
 3. 批不变推理为什么和投机解码不能同时开？
 
-## 🕳️ 踩坑记录
+## 踩坑记录
 
 > [!ATTENTION]
 > 
 
-## 🔗 资料
+## 资料
 
 - [DeepInfer GitHub](https://github.com/deepseek-ai/DeepInfer)
 - [DeepSeek-V4.1-Flash-1017 模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)

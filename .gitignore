@@ -4,3 +4,4 @@ node_modules/
 __pycache__/
 _to_delete/
 _site/
+.pytest_cache/

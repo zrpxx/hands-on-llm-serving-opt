@@ -46,7 +46,7 @@
       search: {
         maxAge: 86400000,
         paths: 'auto',
-        placeholder: '🔍 搜索：KV Cache / AWQ / TTFT …',
+        placeholder: '搜索',
         noData: '没找到，换个关键词试试',
         depth: 3,
         hideOtherSidebarContent: false,
@@ -56,7 +56,7 @@
       copyCode: {
         buttonText: '复制',
         errorText: '复制失败',
-        successText: '已复制 ✓',
+        successText: '已复制',
       },
 
       // ── 上一节 / 下一节 ─────────────────────────
@@ -145,7 +145,7 @@
             return html +
               '<div class="clear-box">' +
               '<button class="clear-btn' + (done ? ' done' : '') + '" data-path="' + path + '">' +
-              (done ? '✅ 已完成（点击撤销）' : '标记本节已完成') +
+              (done ? '已完成（点击撤销）' : '标记本节已完成') +
               '</button></div>';
           });
           hook.doneEach(function () {
@@ -157,7 +157,7 @@
                 save(p);
                 var done = !!p[k];
                 btn.classList.toggle('done', done);
-                btn.textContent = done ? '✅ 已完成（点击撤销）' : '标记本节已完成';
+                btn.textContent = done ? '已完成（点击撤销）' : '标记本节已完成';
                 paintSidebar();
               };
             }

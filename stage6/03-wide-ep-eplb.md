@@ -1,21 +1,21 @@
-# 6.3 Wide EP 与 EPLB：大规模 MoE 专家并行
+# 6.3 Wide EP 与 EPLB
 
-> 📎 书外内容
+> 书外内容
 
 > [!NOTE]
-> 本节状态：⬜ 未开始 ｜ 预计用时：__ h ｜ 完成日期：____
+> 状态：未开始 ｜ 预计用时：__ h ｜ 完成日期：____
 
-## 🎯 学习目标
+## 学习目标
 
 - [ ] 讲清楚 Wide EP 相比"TP 切 MoE"在显存和通信上的取舍
 - [ ] 理解 EPLB 用冗余专家副本平衡热点专家的思路
 - [ ] 读 DeepEP 的 dispatch / combine 接口，区分高吞吐模式和低延迟模式
 
-## 📝 要点
+## 要点
 
-## 🧮 核心公式
+## 核心公式
 
-## 🔬 动手实验
+## 动手实验
 
 ```bash
 # 实验命令
@@ -28,14 +28,14 @@
 
 **结论（一句话，带数字）**：
 
-## ❓ 自测题
+## 自测题
 
 1. 
 2. 
 
-## 🕳️ 踩坑记录
+## 踩坑记录
 
-## 🔗 资料
+## 资料
 
 - [deepseek-ai/DeepEP](https://github.com/deepseek-ai/DeepEP)
 - [deepseek-ai/EPLB](https://github.com/deepseek-ai/EPLB)

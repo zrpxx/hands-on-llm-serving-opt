@@ -2,25 +2,25 @@
 
 | 阶段 | 论文 | 一句话 |
 |---|---|---|
-| ① | *Orca: A Distributed Serving System for Transformer-Based Generative Models* (OSDI'22) | iteration-level scheduling，Continuous Batching 的源头 |
-| ① | *Efficient Memory Management for LLM Serving with PagedAttention* (SOSP'23) | vLLM，把 OS 分页搬进 KV Cache |
-| ① | *SGLang: Efficient Execution of Structured Language Model Programs* (2023) | RadixAttention，前缀复用 |
-| ① | *SARATHI / Sarathi-Serve* (2023/2024) | Chunked Prefill，平衡 TTFT 与 TPOT |
-| ② | *GPTQ: Accurate Post-Training Quantization for GPTs* (ICLR'23) | 基于 Hessian 的逐层量化 |
-| ② | *AWQ: Activation-aware Weight Quantization* (MLSys'24) | 保护 1% 显著通道 |
-| ② | *SmoothQuant* (ICML'23) | 激活离群值迁移，W8A8 |
-| ② | *FP8 Formats for Deep Learning* (2022) | E4M3 / E5M2 |
-| ③ | *FlashAttention* 1 / 2 / 3 (2022–2024) | IO-aware 分块注意力 |
-| ③ | *Fast Inference from Transformers via Speculative Decoding* (ICML'23) | 投机采样无损性证明 |
-| ③ | *Medusa* (2024) / *EAGLE* 1–3 (2024–2025) | 自带 draft head 的投机方案 |
-| ③ | *GQA* (2023) / *DeepSeek-V2 MLA* (2024) | KV 头压缩 |
-| ③ | *Triton: An Intermediate Language and Compiler for Tiled NN Computations* (2019) | Triton 语言 |
-| ④ | *Megatron-LM* (2019) | 张量并行 |
-| ④ | *DistServe* (OSDI'24) / *Splitwise* (ISCA'24) | Prefill-Decode 分离 |
-| ④ | *Mooncake* (2024) | 以 KV Cache 为中心的分离式架构 |
-| ④ | *S-LoRA* / *Punica* (2023) | Multi-LoRA Serving |
+| 1 | *Orca: A Distributed Serving System for Transformer-Based Generative Models* (OSDI'22) | iteration-level scheduling，Continuous Batching 的源头 |
+| 1 | *Efficient Memory Management for LLM Serving with PagedAttention* (SOSP'23) | vLLM，把 OS 分页搬进 KV Cache |
+| 1 | *SGLang: Efficient Execution of Structured Language Model Programs* (2023) | RadixAttention，前缀复用 |
+| 1 | *SARATHI / Sarathi-Serve* (2023/2024) | Chunked Prefill，平衡 TTFT 与 TPOT |
+| 2 | *GPTQ: Accurate Post-Training Quantization for GPTs* (ICLR'23) | 基于 Hessian 的逐层量化 |
+| 2 | *AWQ: Activation-aware Weight Quantization* (MLSys'24) | 保护 1% 显著通道 |
+| 2 | *SmoothQuant* (ICML'23) | 激活离群值迁移，W8A8 |
+| 2 | *FP8 Formats for Deep Learning* (2022) | E4M3 / E5M2 |
+| 3 | *FlashAttention* 1 / 2 / 3 (2022–2024) | IO-aware 分块注意力 |
+| 3 | *Fast Inference from Transformers via Speculative Decoding* (ICML'23) | 投机采样无损性证明 |
+| 3 | *Medusa* (2024) / *EAGLE* 1–3 (2024–2025) | 自带 draft head 的投机方案 |
+| 3 | *GQA* (2023) / *DeepSeek-V2 MLA* (2024) | KV 头压缩 |
+| 3 | *Triton: An Intermediate Language and Compiler for Tiled NN Computations* (2019) | Triton 语言 |
+| 4 | *Megatron-LM* (2019) | 张量并行 |
+| 4 | *DistServe* (OSDI'24) / *Splitwise* (ISCA'24) | Prefill-Decode 分离 |
+| 4 | *Mooncake* (2024) | 以 KV Cache 为中心的分离式架构 |
+| 4 | *S-LoRA* / *Punica* (2023) | Multi-LoRA Serving |
 
-## 阶段 ⑥：2025–2026 生产实践
+## 第 6 部分：2025–2026 生产实践
 
 | 主题 | 资料 | 一句话 |
 |---|---|---|

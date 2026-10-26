@@ -9,7 +9,7 @@
 
 一个模型能不能用起来，很多时候不取决于它在评测上高几分，而取决于首 token 要等多久、一张卡能撑多少并发、每百万 token 花多少钱。这些问题靠经验调参能解决一部分，但我经常说不清某个参数**为什么**有效，换一个模型或一批卡就又要从头试。
 
-这本书从单次生成讲到分布式部署，脉络清楚，适合当主线。它的局限是成书时间：2026 年里有不少新东西进入了生产，比如 NVFP4 低精度格式、大规模专家并行（Wide EP）、Attention-FFN 分离，还有 10 月 DeepSeek 开源的生产推理引擎 DeepInfer。所以前五个阶段跟着书把基础打牢，最后一个阶段拿当前的生产实现来对照，补上书里没有的部分。
+这本书从单次生成讲到分布式部署，脉络清楚，适合当主线。它的局限是成书时间：2026 年里有不少新东西进入了生产，比如 NVFP4 低精度格式、大规模专家并行（Wide EP）、Attention-FFN 分离，还有 10 月 DeepSeek 开源的生产推理引擎 DeepInfer。所以前五部分跟着书把基础打牢，第 6 部分拿当前的生产实现来对照，补上书里没有的部分。
 
 几条给自己的约定：
 
@@ -17,7 +17,7 @@
 - **先判断瓶颈，再挑优化手段。** 大多数优化只在特定瓶颈下有效，用错了地方没有收益，甚至会更慢。
 - **关键机制亲手实现一遍。** 不追求性能比得上框架，只为弄明白它为什么这样设计。
 - **以源码和论文为准。** 二手解读容易过时，尤其是这个领域。
-- **每个阶段留下能跑的代码和能复现的记录。**
+- **每一部分都留下能跑的代码和能复现的记录。**
 
 做完这些，我希望达到的程度是：给定模型、硬件和延迟要求，能说清楚该怎么部署、性能大概在什么范围、瓶颈在哪里，并且能用实验验证。
 
@@ -27,31 +27,31 @@
 
 ```mermaid
 flowchart LR
-  S0["⓪ 基础<br/>显存 / Roofline / 指标"] --> S1["① 推理引擎<br/>KV Cache · Batching · vLLM"]
+  S0["0. 基础与估算<br/>显存 / Roofline / 指标"] --> S1["1. 推理引擎<br/>KV Cache · Batching · vLLM"]
   S1 --> B1{{"项目 1<br/>MiniServe"}}
-  B1 --> S2["② 量化<br/>GPTQ · AWQ · FP8"]
+  B1 --> S2["2. 量化<br/>GPTQ · AWQ · FP8"]
   S2 --> B2{{"项目 2<br/>Quant Arena"}}
-  B2 --> S3["③ 加速<br/>FlashAttn · Triton · 投机采样"]
+  B2 --> S3["3. 加速<br/>FlashAttn · Triton · 投机采样"]
   S3 --> B3{{"项目 3<br/>Kernel Forge"}}
-  B3 --> S4["④ 分布式<br/>TP/PP/EP · PD 分离 · 路由"]
+  B3 --> S4["4. 分布式<br/>TP/PP/EP · PD 分离 · 路由"]
   S4 --> B4{{"项目 4<br/>Cluster Commander"}}
-  B4 --> S5["⑤ 书的收尾<br/>端到端优化 · 前沿"]
-  S5 --> S6["⑥ 2026 生产实践<br/>DeepInfer · NVFP4 · Wide EP · AFD"]
+  B4 --> S5["5. 实践与前沿<br/>端到端优化"]
+  S5 --> S6["6. 2026 生产实践<br/>DeepInfer · NVFP4 · Wide EP · AFD"]
   S6 --> F["毕业项目"]
 ```
 
-| 阶段 | 主题 | 来源 | 关键词 |
+| 部分 | 主题 | 来源 | 关键词 |
 |---|---|---|---|
-| ⓪ | 基础：先学会估算 | 书 Ch1, Ch4, Ch5 | GPU 规格、显存估算、算术强度、TTFT/TPOT |
-| ① | 推理引擎与高效 Serving | 书 Ch2, Ch3, Ch6, Ch8 | KV Cache、Continuous Batching、PagedAttention、RadixAttention |
-| ② | 压缩与量化 | 书 Ch6, Ch9 | GPTQ、AWQ、SmoothQuant📎、FP8、INT4、KV 量化 |
-| ③ | 加速算法与算子 | 书 Ch6, Ch7, Ch10 | FlashAttention、Triton 算子📎、投机采样、Profiling |
-| ④ | 分布式与大规模 Serving | 书 Ch3, Ch4, Ch7, Ch10 | TP/PP/EP、PD 分离、LMCache、负载均衡、Multi-LoRA |
-| ⑤ | 实战与前沿 | 书 Ch9, Ch10 | 8 步优化法、Semantic Cache、多模态、RL Serving |
-| ⑥ | 2026 生产实践 | 源码 / 论文 / 博客 📎 | DeepInfer、NVFP4、Wide EP + EPLB、AFD、MTP、批不变推理、TileLang |
+| 0 | 基础与估算 | 书 Ch1, Ch4, Ch5 | GPU 规格、显存估算、算术强度、TTFT/TPOT |
+| 1 | 推理引擎与高效 Serving | 书 Ch2, Ch3, Ch6, Ch8 | KV Cache、Continuous Batching、PagedAttention、RadixAttention |
+| 2 | 压缩与量化 | 书 Ch6, Ch9 | GPTQ、AWQ、SmoothQuant、FP8、INT4、KV 量化 |
+| 3 | 加速算法与算子 | 书 Ch6, Ch7, Ch10 | FlashAttention、Triton 算子、投机采样、Profiling |
+| 4 | 分布式与大规模 Serving | 书 Ch3, Ch4, Ch7, Ch10 | TP/PP/EP、PD 分离、LMCache、负载均衡、Multi-LoRA |
+| 5 | 实践与前沿 | 书 Ch9, Ch10 | 8 步优化法、Semantic Cache、多模态、RL Serving |
+| 6 | 2026 生产实践 | 源码 / 论文 / 博客 | DeepInfer、NVFP4、Wide EP + EPLB、AFD、MTP、批不变推理、TileLang |
 
 > [!NOTE]
-> 📎 表示书外内容。书中的 "Triton" 多数指 Triton Inference Server，和阶段三用来写算子的 Triton 语言不是一回事。
+> SmoothQuant、用 Triton 语言写算子、第 6 部分的全部内容都不在书中，需要额外阅读论文与源码。另外，书中的 "Triton" 多数指 Triton Inference Server，与第 3 部分用来写算子的 Triton 语言是两回事。
 
 ---
 
@@ -61,26 +61,27 @@ flowchart LR
 
 ### 项目 1 · MiniServe：手写一个迷你推理引擎
 
-> 前置：阶段 ⓪ ① ｜ 对应：Ch2 / Ch3 / Ch6 / Ch8
+> 前置：第 0、1 部分 ｜ 对应：Ch2 / Ch3 / Ch6 / Ch8 ｜ 详细说明：[项目 1 页面](stage1/boss-miniserve.md)
 
-不用 vLLM，用 PyTorch + FastAPI 从零实现一个小模型（Qwen 0.5B–1.5B）的在线推理服务。
+不用 vLLM，用 PyTorch + FastAPI 实现一个能服务 Qwen3 / Llama 系列稠密模型的在线推理引擎。仓库提供骨架代码、参考实现、正确性测试（以 Hugging Face 输出为参照）和压测工具。
 
 | 步骤 | 内容 |
 |---|---|
-| 1-1 | 朴素生成 → 加 KV Cache，对比 decode 每 token 延迟 |
-| 1-2 | Static Batching → Continuous Batching（按迭代调度，请求随到随走） |
-| 1-3 | 分页式 KV Cache（block table + 空闲块池），支持抢占 |
-| 1-4 | SSE 流式输出 + OpenAI 兼容的 `/v1/chat/completions` |
+| 1-1 | Hugging Face 逐请求基线，对比有无 KV Cache |
+| 1-2 | 连续批处理调度器（token 预算、并发上限、chunked prefill） |
+| 1-3 | 分页 KV Cache（block table + 空闲块池）、分页注意力、重算式抢占 |
+| 1-4 | 后台引擎循环 + OpenAI 兼容接口 + SSE 流式输出 |
 
 **完成标准**
-- [ ] 同一负载下吞吐达到 HF `generate()` 基线的 5 倍以上
-- [ ] 吞吐达到同模型 vLLM 的 30% 以上，并说明剩下的差距来自哪里
+- [ ] 全部正确性测试通过
+- [ ] 同一负载下吞吐达到 HF 基线的 5 倍以上
+- [ ] 吞吐达到同模型 vLLM 的 30% 以上，或用 profiling 数据定量解释差距
 - [ ] 画出 TTFT / TPOT 的 P50、P99 随并发（1→64）变化的曲线
-- [ ] 用公式预估的 KV Cache 容量与实测最大并发误差在 15% 以内
+- [ ] KV Cache 容量的估算值与实测误差在 15% 以内
 
 ### 项目 2 · Quant Arena：量化方案对比
 
-> 前置：阶段 ② ｜ 对应：Ch6 / Ch9
+> 前置：第 2 部分 ｜ 对应：Ch6 / Ch9
 
 对 Qwen3-8B（或 14B）比较几种量化方案，在质量、速度、显存三个维度上找出帕累托前沿。
 
@@ -88,7 +89,7 @@ flowchart LR
 |---|---|
 | 基线 | BF16 |
 | 只量化权重 | GPTQ-INT4、AWQ-INT4（W4A16） |
-| 权重 + 激活 | FP8（W8A8）、SmoothQuant-INT8📎 |
+| 权重 + 激活 | FP8（W8A8）、SmoothQuant-INT8|
 | KV 量化 | FP8 KV Cache，叠加在上面任一方案上 |
 
 **完成标准**
@@ -99,9 +100,9 @@ flowchart LR
 
 ### 项目 3 · Kernel Forge：手写算子与投机采样
 
-> 前置：阶段 ③ ｜ 对应：Ch6 / Ch7 / Ch10
+> 前置：第 3 部分 ｜ 对应：Ch6 / Ch7 / Ch10
 
-**A. 算子（Triton 语言📎）**
+**A. 算子（Triton 语言）**
 - [ ] 写一个融合算子 `fused_add_rmsnorm`，带宽利用率达到硬件峰值的 70% 以上
 - [ ] 写 FlashAttention forward（分块 + online softmax），数值误差 < 1e-2，8K 序列下显存明显低于朴素实现
 - [ ] 用 Nsight Systems 抓一次 vLLM decode step，找出耗时最多的 5 个 kernel
@@ -113,7 +114,7 @@ flowchart LR
 
 ### 项目 4 · Cluster Commander：在 SLO 约束下调度集群
 
-> 前置：阶段 ④ ｜ 对应：Ch3 / Ch4 / Ch7 / Ch10 ｜ 需要 2 张以上 GPU
+> 前置：第 4 部分 ｜ 对应：Ch3 / Ch4 / Ch7 / Ch10 ｜ 需要 2 张以上 GPU
 
 给定 SLO（例如 TTFT P99 < 1s、TPOT P99 < 50ms），用多个实例搭一个小集群，尽量提高 Goodput（满足 SLO 的请求吞吐）。
 
@@ -131,7 +132,7 @@ flowchart LR
 
 ### 毕业项目（二选一）
 
-> 前置：阶段 ⑤ ⑥
+> 前置：第 5、6 部分
 
 **A. 端到端优化报告。** 选一个自己真正在用的模型和场景，按 Ch9 的 8 步法走完：摸清硬件 → 构造基准流量 → 定指标 → 部署基线 → 测基线 → 量化 → 叠加其他优化 → 分布式。每一步都要有前后对比数字，最后回答一个问题：如果只能开三个优化，开哪三个。
 
@@ -149,8 +150,7 @@ npm i -g docsify-cli
 docsify serve .          # 打开 http://localhost:3000
 ```
 
-- 每页底部有「标记本节已完成」按钮，进度存在本地浏览器，侧边栏对应条目会打 ✓
-- 每节笔记用同一个模板：学习目标 → 书中要点 → 核心公式 → 动手实验 → 自测题 → 踩坑记录（见 [路线图](guide/roadmap.md)）
+- 每页底部有「标记本节已完成」按钮，进度存在本地浏览器，侧边栏对应条目会打 - 每节笔记用同一个模板：学习目标 → 书中要点 → 核心公式 → 动手实验 → 自测题 → 踩坑记录（见 [路线图](guide/roadmap.md)）
 
 ### 部署到 GitHub Pages
 

@@ -1,21 +1,21 @@
-# 6.9 新一代算子 DSL：TileLang / CuTe DSL
+# 6.9 算子 DSL：TileLang 与 CuTe DSL
 
-> 📎 书外内容
+> 书外内容
 
 > [!NOTE]
-> 本节状态：⬜ 未开始 ｜ 预计用时：__ h ｜ 完成日期：____
+> 状态：未开始 ｜ 预计用时：__ h ｜ 完成日期：____
 
-## 🎯 学习目标
+## 学习目标
 
 - [ ] 比较 Triton、TileLang、CuTe DSL 的抽象层级：谁管 tile、谁管线程、谁管内存层次
 - [ ] 用 TileLang 重写 3.3 里的一个算子，对比代码量和性能
 - [ ] 读 DeepInfer 中的一个 TileLang 算子
 
-## 📝 要点
+## 要点
 
-## 🧮 核心公式
+## 核心公式
 
-## 🔬 动手实验
+## 动手实验
 
 ```bash
 # 实验命令
@@ -28,14 +28,14 @@
 
 **结论（一句话，带数字）**：
 
-## ❓ 自测题
+## 自测题
 
 1. 
 2. 
 
-## 🕳️ 踩坑记录
+## 踩坑记录
 
-## 🔗 资料
+## 资料
 
 - [tile-ai/tilelang](https://github.com/tile-ai/tilelang)
 - NVIDIA CUTLASS 4 中的 CuTe DSL 文档
