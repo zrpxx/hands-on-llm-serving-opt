@@ -1,0 +1,57 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一次部署；新的推送不会打断正在进行的部署
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify every sidebar / navbar / in-page link points to an existing file
+        run: python scripts/check_links.py
+
+  deploy:
+    name: Deploy
+    needs: check
+    # PR 只做检查，合入 main 才部署
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          rsync -a ./ _site/ \
+            --exclude '.git' --exclude '.github' --exclude '_site' \
+            --exclude 'scripts' --exclude '_to_delete' --exclude 'node_modules'
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

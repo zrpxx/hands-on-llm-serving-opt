@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>LLM Serving & Optimization 自学笔记</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+  <meta name="description" content="基于《Hands-On LLM Serving and Optimization》的个人自学文档库：从基础到分布式部署，以及 2026 年的生产推理实践" />
+
+  <!-- 主题：vue（亮色）。如果喜欢暗色，把 vue.css 换成 dark.css -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/themes/vue.css" />
+  <!-- KaTeX：Attention / Roofline / 量化公式都要用 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <link rel="stylesheet" href="assets/custom.css" />
+</head>
+<body>
+  <div id="app">加载中……</div>
+
+  <script>
+    window.$docsify = {
+      name: 'LLM Serving 自学笔记',
+      repo: 'https://github.com/zrpxx/hands-on-llm-serving-opt',
+      homepage: 'README.md',
+
+      // ── 封面 & 导航 ─────────────────────────────
+      coverpage: true,                // 读取 _coverpage.md
+      onlyCover: false,
+      loadNavbar: true,               // 读取 _navbar.md
+      mergeNavbar: true,              // 小屏时把导航栏并入侧边栏
+
+      // ── 侧边栏 ─────────────────────────────────
+      loadSidebar: true,
+      alias: {                        // 所有子目录共用根目录的侧边栏 / 导航栏
+        '/.*/_sidebar.md': '/_sidebar.md',
+        '/.*/_navbar.md': '/_navbar.md',
+      },
+      subMaxLevel: 3,                 // 当前页 h2/h3 自动展开为子目录
+      maxLevel: 4,
+      auto2top: true,
+      topMargin: 64,                  // 锚点跳转时为顶部留白
+      relativePath: false,
+      notFoundPage: '_404.md',
+      executeScript: true,
+
+      // ── 搜索 ───────────────────────────────────
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: '🔍 搜索：KV Cache / AWQ / TTFT …',
+        noData: '没找到，换个关键词试试',
+        depth: 3,
+        hideOtherSidebarContent: false,
+      },
+
+      // ── 一键复制 ───────────────────────────────
+      copyCode: {
+        buttonText: '复制',
+        errorText: '复制失败',
+        successText: '已复制 ✓',
+      },
+
+      // ── 上一节 / 下一节 ─────────────────────────
+      pagination: {
+        previousText: '上一节',
+        nextText: '下一节',
+        crossChapter: true,
+        crossChapterText: true,
+      },
+
+      // ── 字数统计 & 阅读时间 ─────────────────────
+      count: {
+        countable: true,
+        position: 'top',
+        margin: '10px',
+        float: 'right',
+        fontsize: '0.85em',
+        color: 'var(--theme-color)',
+        language: 'chinese',
+        localization: { words: '', minute: '' },
+        isExpected: true,
+      },
+
+      // ── 代码 Tabs（同一实验的 vLLM / SGLang / TRT-LLM 写法并排）
+      tabs: {
+        persist: true,
+        sync: true,
+        theme: 'classic',
+        tabComments: true,
+        tabHeadings: true,
+      },
+
+      // ── 提示块：> [!NOTE] / [!TIP] / [!WARNING] / [!ATTENTION]
+      'flexible-alerts': {
+        style: 'flat',
+        note: { label: '笔记' },
+        tip: { label: '技巧' },
+        warning: { label: '注意' },
+        attention: { label: '踩坑' },
+      },
+
+      // ── Mermaid：架构图 / 时序图直接写在 markdown 里
+      markdown: {
+        renderer: {
+          code: function (code, lang) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid">' + code + '</div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          },
+        },
+      },
+
+      plugins: [
+        // Mermaid 渲染
+        function (hook) {
+          hook.doneEach(function () {
+            if (window.mermaid) {
+              try { window.mermaid.run({ querySelector: '.mermaid' }); } catch (e) {}
+            }
+          });
+        },
+
+        // 进度打卡：每页底部一个「标记本节已完成」按钮，进度存在本地浏览器
+        function (hook, vm) {
+          var KEY = 'llmopt-progress-v1';
+          function load() {
+            try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
+          }
+          function save(p) {
+            try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {}
+          }
+          function paintSidebar() {
+            var p = load();
+            document.querySelectorAll('.sidebar-nav a').forEach(function (a) {
+              var raw = a.getAttribute('href') || '';
+              if (raw.indexOf('?id=') !== -1) return;   // 跳过页内小标题锚点
+              var href = raw.replace(/^#\//, '');
+              a.classList.toggle('is-cleared', !!p[href]);
+            });
+          }
+          hook.afterEach(function (html) {
+            var path = vm.route.path.replace(/^\//, '');
+            if (!path || path === 'README' || path === '') return html;
+            var done = !!load()[path];
+            return html +
+              '<div class="clear-box">' +
+              '<button class="clear-btn' + (done ? ' done' : '') + '" data-path="' + path + '">' +
+              (done ? '✅ 已完成（点击撤销）' : '标记本节已完成') +
+              '</button></div>';
+          });
+          hook.doneEach(function () {
+            var btn = document.querySelector('.clear-btn');
+            if (btn) {
+              btn.onclick = function () {
+                var p = load(), k = btn.dataset.path;
+                if (p[k]) { delete p[k]; } else { p[k] = Date.now(); }
+                save(p);
+                var done = !!p[k];
+                btn.classList.toggle('done', done);
+                btn.textContent = done ? '✅ 已完成（点击撤销）' : '标记本节已完成';
+                paintSidebar();
+              };
+            }
+            paintSidebar();
+          });
+        },
+
+        // 页脚
+        function (hook) {
+          hook.afterEach(function (html) {
+            return html + '<footer class="site-footer">Built with Docsify · 基于 <em>Hands-On LLM Serving and Optimization</em> (Chi Wang &amp; Peiheng Hu, O\'Reilly) 的个人学习笔记</footer>';
+          });
+        },
+      ],
+    };
+  </script>
+
+  <!-- Docsify 核心 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"></script>
+
+  <!-- 官方插件：搜索 / 图片缩放 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js"></script>
+
+  <!-- 社区插件 -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2.1.1/dist/docsify-copy-code.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2.10.1/dist/docsify-pagination.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-count@1.1.0/dist/countable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1.6.3/dist/docsify-tabs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-plugin-flexible-alerts@1.1.1/dist/docsify-plugin-flexible-alerts.min.js"></script>
+
+  <!-- 公式 -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-katex@1.4.4/dist/docsify-katex.js"></script>
+
+  <!-- 图表 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
+
+  <!-- 代码高亮：Prism 语言包（docsify 自带 Prism 核心，这里补齐语言） -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-toml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-diff.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+/* ===== 全局主题色：终端绿 ===== */
+:root {
+  --theme-color: #10b981;
+  --boss-color: #ef4444;
+  --extra-color: #8b5cf6;
+}
+
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; }
+.markdown-section { max-width: 920px; }
+.markdown-section code, .markdown-section pre {
+  font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+}
+
+/* ===== 封面 ===== */
+section.cover { color: #e5e7eb; }
+section.cover h1 { font-family: "JetBrains Mono", Menlo, monospace; letter-spacing: -1px; }
+section.cover h1 a span { color: #34d399; }
+section.cover blockquote > p > a { border-bottom: 2px solid #34d399; color: #d1fae5; }
+section.cover .cover-main > p:last-child a {
+  border-radius: 4px; border-color: #34d399; color: #34d399;
+}
+section.cover .cover-main > p:last-child a:last-child {
+  background: #34d399; color: #052e16;
+}
+section.cover ul { color: #9ca3af; }
+
+/* ===== 侧边栏：阶段标题、项目、书外内容 ===== */
+.sidebar-nav > ul > li > p, .sidebar-nav > ul > li > strong {
+  font-weight: 700; margin-top: 18px;
+}
+.sidebar-nav a[href*="boss"] { color: var(--boss-color) !important; font-weight: 600; }
+.sidebar-nav a.is-cleared::after { content: " ✓"; color: var(--theme-color); font-weight: 700; }
+
+/* ===== 进度打卡按钮 ===== */
+.clear-box { text-align: center; margin: 48px 0 8px; }
+.clear-btn {
+  cursor: pointer; padding: 10px 22px; font-size: 15px; font-weight: 600;
+  border: 2px solid var(--theme-color); border-radius: 6px;
+  background: transparent; color: var(--theme-color); transition: all .15s;
+}
+.clear-btn:hover { background: var(--theme-color); color: #fff; }
+.clear-btn.done { background: var(--theme-color); color: #fff; }
+
+/* ===== 表格 ===== */
+.markdown-section table { display: table; width: 100%; }
+.markdown-section th { background: rgba(16, 185, 129, .08); }
+
+/* ===== 页脚 ===== */
+.site-footer {
+  margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee;
+  font-size: 12px; color: #999; text-align: center;
+}
+
+/* ===== Mermaid 居中 ===== */
+.mermaid { text-align: center; margin: 1.5em 0; }
+
+/* 侧边栏长标题换行显示，不截断 */
+.sidebar ul li a { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.5; padding: 3px 0; }
+
+/* 表格首列（短标签）不换行 */
+.markdown-section td:first-child { white-space: nowrap; }
