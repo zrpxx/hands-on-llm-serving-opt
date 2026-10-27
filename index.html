@@ -2,10 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>LLM Serving & Optimization 自学笔记</title>
+  <title>Hands-On LLM Serving & Optimization 交互式实战教程</title>
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
-  <meta name="description" content="基于《Hands-On LLM Serving and Optimization》的个人自学文档库：从基础到分布式部署，以及 2026 年的生产推理实践" />
+  <meta name="description" content="从零构建高性能大模型推理系统：原理图解、交互沙盒、手写推理引擎与 2026 生产推理实践" />
 
   <!-- 主题：vue（亮色）。如果喜欢暗色，把 vue.css 换成 dark.css -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/themes/vue.css" />
@@ -18,7 +18,7 @@
 
   <script>
     window.$docsify = {
-      name: 'LLM Serving 自学笔记',
+      name: 'LLM Serving 实战教程',
       repo: 'https://github.com/zrpxx/hands-on-llm-serving-opt',
       homepage: 'README.md',
 
@@ -46,7 +46,7 @@
       search: {
         maxAge: 86400000,
         paths: 'auto',
-        placeholder: '搜索',
+        placeholder: '搜索教程章节、概念或算子',
         noData: '没找到，换个关键词试试',
         depth: 3,
         hideOtherSidebarContent: false,
@@ -92,10 +92,10 @@
       // ── 提示块：> [!NOTE] / [!TIP] / [!WARNING] / [!ATTENTION]
       'flexible-alerts': {
         style: 'flat',
-        note: { label: '笔记' },
+        note: { label: '说明' },
         tip: { label: '技巧' },
         warning: { label: '注意' },
-        attention: { label: '踩坑' },
+        attention: { label: '避坑' },
       },
 
       // ── Mermaid：架构图 / 时序图直接写在 markdown 里
@@ -111,11 +111,14 @@
       },
 
       plugins: [
-        // Mermaid 渲染
+        // Mermaid 渲染 + 交互式组件挂载
         function (hook) {
           hook.doneEach(function () {
             if (window.mermaid) {
               try { window.mermaid.run({ querySelector: '.mermaid' }); } catch (e) {}
+            }
+            if (window.LLMWidgets && typeof window.LLMWidgets.mountAll === 'function') {
+              window.LLMWidgets.mountAll();
             }
           });
         },
@@ -145,7 +148,7 @@
             return html +
               '<div class="clear-box">' +
               '<button class="clear-btn' + (done ? ' done' : '') + '" data-path="' + path + '">' +
-              (done ? '已完成（点击撤销）' : '标记本节已完成') +
+              (done ? '已完成本节学习（点击撤销）' : '标记本节已完成') +
               '</button></div>';
           });
           hook.doneEach(function () {
@@ -157,7 +160,7 @@
                 save(p);
                 var done = !!p[k];
                 btn.classList.toggle('done', done);
-                btn.textContent = done ? '已完成（点击撤销）' : '标记本节已完成';
+                btn.textContent = done ? '已完成本节学习（点击撤销）' : '标记本节已完成';
                 paintSidebar();
               };
             }
@@ -168,12 +171,17 @@
         // 页脚
         function (hook) {
           hook.afterEach(function (html) {
-            return html + '<footer class="site-footer">Built with Docsify · 基于 <em>Hands-On LLM Serving and Optimization</em> (Chi Wang &amp; Peiheng Hu, O\'Reilly) 的个人学习笔记</footer>';
+            return html + '<footer class="site-footer">Hands-On LLM Serving &amp; Optimization 交互式实战教程 · 结合 <em>Hands-On LLM Serving and Optimization</em> (O\'Reilly) 与 2026 生产推理框架源码</footer>';
           });
         },
       ],
     };
   </script>
+
+  <!-- 交互式控件库 -->
+  <script src="assets/widgets/core.js"></script>
+  <script src="assets/widgets/stage0.js"></script>
+  <script src="assets/widgets/stage1.js"></script>
 
   <!-- Docsify 核心 -->
   <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"></script>

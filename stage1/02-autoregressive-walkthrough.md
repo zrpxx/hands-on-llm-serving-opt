@@ -1,140 +1,194 @@
-# 1.2 自回归生成的执行过程
-
-> 对应书中第 2 章 The Autoregressive Nature of Transformers、Model Prediction, Line by Line
+# 1.2 自回归生成的执行过程：手写生成循环与解码采样
 
 ## 学习目标
 
-- 不借助 `generate()`，手写一个逐 token 生成的循环，并解释每一步做了什么。
-- 理解常见的解码策略（贪心、温度、top-k、top-p）以及停止条件。
-- 观察不使用 KV Cache 时每个 token 的耗时如何随长度增长，并解释原因。
+完成本节学习后，你将能够：
+- **抛开黑盒 `model.generate()`，用 15 行原生 PyTorch 代码手写出完整的逐词生成循环**。
+- **解释为什么在最朴素的自回归循环中，生成越往后越慢**（理解无缓存时的重复计算陷阱）。
+- **彻底掌握从 Logits 分数到具体 Token 的四种解码策略**：贪心（Greedy）、温度缩放（Temperature）、Top-K 与 Top-P（核采样）的数学原理与工程实现。
+- **解决流式输出中的“中文乱码 ``”问题**：理解多字节 UTF-8 字符的增量反分词（Incremental Detokenization）机制。
 
-## 1. 自回归
+---
 
-模型一次只预测一个 token。预测出来的 token 拼接到输入末尾，作为下一步的输入，直到满足停止条件：
+## 1. 为什么大模型不能像填空题一样，一口气吐出整段话？
+
+很多刚接触大模型的同学会问：“既然输入一段 100 字的 Prompt，GPU 可以一次性并行算完；那为什么输出一段 100 字的回答时，模型不能一次性同时蹦出这 100 个字，非要像打字机一样一个字一个字往外蹦呢？”
+
+答案在于生成式大模型的数学本质——**自回归（Autoregression）**：
+模型在预测第 $k$ 个词时，**必须把前 $k-1$ 个已经生成的词作为已知输入条件**。如果第 1 个词还没定下来是 `"北京"` 还是 `"上海"`，模型就根本无法确定第 2 个词该接 `"烤鸭"` 还是 `"外滩"`！
 
 ```mermaid
 flowchart LR
-  P["prompt"] --> M1["模型"] --> T1["Washington"]
-  T1 --> M2["模型（prompt + Washington）"] --> T2["D.C."]
-  T2 --> M3["模型（prompt + Washington D.C.）"] --> T3["is"]
-  T3 --> M4["……"]
+  P["初始输入：<br/>'中国的首都是'"] --> M1["第 1 次前向传播"] --> T1["生成：'北'"]
+  T1 --> P2["拼接成新输入：<br/>'中国的首都是北'"] --> M2["第 2 次前向传播"] --> T2["生成：'京'"]
+  T2 --> P3["拼接成新输入：<br/>'中国的首都是北京'"] --> M3["第 3 次前向传播"] --> T3["生成：'。' (EOS 停止)"]
 ```
 
-这是 LLM 服务的大部分特殊性的来源：
+这个“**预测 1 个新词 $\to$ 拼回输入末尾 $\to$ 再预测下 1 个词**”的循环，就是大模型推理服务一切特殊性的总源头：
+1. **单次请求寿命极长**：生成一个 500 词的回答，就要在 GPU 上循环跑 **500 次**完整的前向传播，持续好几秒甚至几分钟。
+2. **输出长度事先未知**：在循环开始前，没有任何人（包括模型自己）知道它会在第 10 步还是第 2000 步吐出结束符 `EOS`。因此系统根本无法在请求开始前精准预知它要占多少显存、跑多久。
 
-- 一个请求要执行几十到几千次前向，持续数秒到数分钟。
-- 输出长度事先未知，无法提前分配好资源。
-- 每一步只产生一个 token，单请求时 GPU 大部分时间在读权重（0.4 节）。
+---
 
-## 2. 手写生成循环
+## 2. 逐行拆解：用 15 行 PyTorch 手写你的第一个生成循环
 
-书中的例 2-1 把 `pipeline` 拆开，展示了最朴素的实现：
+在调用 Hugging Face 的 `model.generate()` 时，上面那个循环被藏在了几千行源码背后。现在我们把它剥离出来，用最直白的 15 行代码亲手写一遍：
 
 ```python
 import time, torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-name = "Qwen/Qwen2.5-0.5B"
+name = "Qwen/Qwen3-0.6B"
 tok = AutoTokenizer.from_pretrained(name)
-model = AutoModelForCausalLM.from_pretrained(name, dtype=torch.float16).cuda().eval()
+model = AutoModelForCausalLM.from_pretrained(name, torch_dtype=torch.bfloat16).cuda().eval()
 
-idx = tok("Write a short introduction about the US capital city.", return_tensors="pt").input_ids.cuda()
-times = []
-for _ in range(100):
+# 1. 分词：把字符串变成形状为 [1, T] 的整数张量
+input_ids = tok("Write a short introduction about Beijing.", return_tensors="pt").input_ids.cuda()
+step_times = []
+
+for step in range(100):
     t0 = time.perf_counter()
     with torch.no_grad():
-        logits = model(idx).logits          # (A)(B) 每一步都把完整序列送进模型
-    probs = torch.softmax(logits[:, -1, :], dim=-1)   # (C) 只取最后一个位置
-    nxt = torch.multinomial(probs, num_samples=1)
-    idx = torch.cat([idx, nxt], dim=1)      # (D) 拼接到输入末尾
+        # (A) 把当前完整的序列送进模型，得到输出 logits，形状为 [1, 当前长度, 词表大小]
+        logits = model(input_ids).logits
+    # (B) 只取最后一个位置（-1）的分数，形状为 [1, 词表大小]，用 softmax 转为概率分布
+    probs = torch.softmax(logits[:, -1, :], dim=-1)
+    # (C) 按概率随机采样出 1 个新 Token ID，形状为 [1, 1]
+    next_id = torch.multinomial(probs, num_samples=1)
+    # (D) 把新生成的 Token ID 拼接到输入序列末尾，长度 +1
+    input_ids = torch.cat([input_ids, next_id], dim=1)
+
     torch.cuda.synchronize()
-    times.append(time.perf_counter() - t0)
-    if nxt.item() == tok.eos_token_id:      # (E) 遇到结束符停止
+    step_times.append(time.perf_counter() - t0)
+    # (E) 如果采样到了结束符 EOS，立刻终止循环
+    if next_id.item() == tok.eos_token_id:
         break
-print(tok.decode(idx[0], skip_special_tokens=True))
+
+print(tok.decode(input_ids[0], skip_special_tokens=True))
 ```
 
-书中在这个例子上生成 100 个 token 用了 9.12 s，平均每个 token 约 0.09 s。更重要的是每个 token 的耗时分布：除第一个 token 外，**耗时随生成长度逐步上升**。原因是每一步都把完整序列重新计算一遍，序列越长，这一步的计算越多。
+### 为什么上面这段代码会“越跑越慢”？
 
-> [!NOTE]
-> 这个例子里每一步都重新计算了所有历史 token 的 K、V，但它们其实不会变（1.1 节第 4 部分）。1.3 节用 KV Cache 消除这部分重复计算。
+如果你把上面代码里每一步的耗时 `step_times` 画成折线图，你会看到一条**随步数不断往上爬的斜线**：
+- 第 1 步：只送入初始的 8 个词。
+- 第 50 步：把 `8 + 50 = 58` 个词**从第 1 个词开始全部重新算了一遍**！
+- 第 100 步：把 `8 + 100 = 108` 个词又从头到尾重新算了一遍！
 
-## 3. 从 logits 到 token：解码策略
+如果初始 Prompt 有 4,000 个词，要生成 1,000 个词，这段朴素代码就会把那 4,000 个词翻来覆去重算 **1,000 遍**！这就是为什么我们在下一节（`1.3`）必须引入 **KV Cache** 来消灭这种荒谬的重复劳动。
 
-LM Head 输出的是词表上每个 token 的分数（logits）。把它变成一个具体的 token 有几种方式：
+---
 
-| 策略 | 做法 | 特点 |
+## 3. 从 Logits 到 Token：四大解码采样策略详解
+
+在上面代码的第 `(B)` 和 `(C)` 步中，模型最后一层 LM Head 算出来的是词表里 151,936 个词各自的原始打分——称为 **Logits**（形状为 `[1, V]`，数值范围在 $-\infty$ 到 $+\infty$ 之间）。
+
+怎么从这 15 万个分数里挑出最终的那 1 个词？不同的业务场景需要不同的**采样策略（Sampling Strategy）**：
+
+```mermaid
+flowchart LR
+  L["原始 Logits z<br/>[-0.5, 4.2, 3.1, ...]"] --> T["① 除以温度 τ<br/>z' = z / τ"]
+  T --> S["② Softmax 归一化<br/>p_i = exp(z'_i) / Σexp(z'_j)"]
+  S --> K["③ Top-K 过滤<br/>只留最高的前 K 个词"]
+  K --> P["④ Top-P (核采样) 过滤<br/>从高到低累加概率达到 P 即截断"]
+  P --> M["⑤ 重新归一化并随机抽样<br/>torch.multinomial"]
+```
+
+| 策略参数 | 数学操作与含义 | 调参直觉与适用场景 |
 |---|---|---|
-| 贪心 | 取 logits 最大的 token | 确定性；适合需要可复现的场景，测试与评测常用 |
-| 温度采样 | $p_i \propto \exp(z_i / \tau)$ 后随机采样 | $\tau < 1$ 更集中，$\tau > 1$ 更分散；$\tau \to 0$ 退化为贪心 |
-| Top-k | 只在概率最高的 $k$ 个 token 中采样 | 截断长尾 |
-| Top-p（核采样） | 只在累计概率达到 $p$ 的最小集合中采样 | 候选集大小随分布自适应 |
-| 重复惩罚 | 降低已出现 token 的分数 | 减少重复 |
+| **贪心解码（Greedy，`temperature = 0`）** | 不做随机抽样，直接取分数最高的词：$\arg\max_i z_i$ | **100% 确定性输出**。适合数学解题、代码生成、自动化评测与单元测试（保证每次跑结果完全一致）。缺点是容易陷入死循环车轱辘话。 |
+| **温度缩放（`temperature` $\tau > 0$）** | 在 Softmax 前把分数除以 $\tau$：$p_i \propto \exp(z_i / \tau)$ | - **$0 < \tau < 1$（降温，如 `0.2`）**：拉大贫富差距，高分词概率更高，回答更严谨保守。<br/>- **$\tau > 1$（升温，如 `1.2`）**：抹平分差，低分冷门词也有机会被选中，更有创意但也更容易胡言乱语。 |
+| **Top-K 采样（`top_k` = $k$）** | 只保留概率排名前 $k$ 的候选词，第 $k+1$ 名及以后的词概率全部强制清零 | 砍掉词表里那十几个万分之一的离谱长尾词，防止偶尔蹦出完全狗屁不通的错别字。 |
+| **Top-P 核采样（Nucleus，`top_p` = $p$）** | 将候选词按概率从大到小排序并累加，一旦累计概率超过阈值 $p$（如 `0.9`），就把后面的词全部砍掉 | **比 Top-K 更聪明**：当模型非常确定时（如 `"中国的首都是"`，`"北京"` 占了 95%），候选池自动收缩为 1 个词；当模型面临开放式续写时，候选池自动放宽到几十个词。 |
 
-从服务角度看，这些操作都只作用于 [batch, V] 的 logits，开销很小；但它们是**逐请求不同**的参数，批处理时需要按行分别处理。MiniServe 的 `_sample` 方法演示了如何对一个批中不同温度、不同 top-p 的请求一次完成采样。
+---
 
-## 4. 停止条件
+## 4. 交互式沙盒：亲手调节 Temperature、Top-K 与 Top-P
 
-| 条件 | 说明 |
-|---|---|
-| 生成结束符（EOS） | 模型自己决定结束。注意有些模型有多个结束符，要从 `generation_config.json` 读取 |
-| 达到 `max_tokens` | 用户指定的输出上限 |
-| 达到模型最大长度 | 输入 + 输出不能超过 `max_model_len` |
-| 停止字符串 | 例如遇到 `"\n\n"` 停止。需要在反分词后的文本上判断 |
+在下面的实验室里，动手拖动三个滑块，观察词表候选词的概率分布是如何被“降温锐化”、“升温拉平”以及被 Top-K / Top-P 截断淘汰的：
 
-压测时常用 `ignore_eos` 忽略结束符，使每个请求都生成到 `max_tokens`，从而固定输出长度、便于比较。
+<div class="llm-widget" data-widget="sampling-autoregressive-lab"></div>
 
-## 5. 分词与反分词
+### 动手试一试
+1. 将 **温度 $\tau$** 拖到最左边 `0`：观察所有概率瞬间 100% 集中在排名第一的 `"北京"` 上（这就是贪心解码）。
+2. 将 **温度 $\tau$** 调高到 `1.8`：观察原本排在末尾的 `"火锅"` 也分到了几个百分点的概率；此时把 **Top-P** 从 `1.00` 往左拖到 `0.80`，看看 `"火锅"` 和 `"美丽"` 是如何被核采样安全截断的！
 
-- token 不等于词。书中提到英文平均每个 token 约 0.75 个单词；中文的比例取决于词表。
-- 流式输出时，一个汉字或 emoji 可能被拆成多个 token，单独解码会得到不完整的字节。正确做法是对累计的 token 序列解码、只输出新增的完整字符。MiniServe 的 `IncrementalDetokenizer` 是一个最简单的实现。
+---
 
-## 6. 用推理框架做同样的事
+## 5. 工程细节：停止条件与流式 UTF-8 增量解码（防乱码 ``）
 
-书中用 vLLM 跑同一个模型和 prompt，生成 128 个 token 用时 1.12 s，HF `pipeline` 用时 19.58 s，单请求就有约 17 倍的差距。差距来自 KV Cache、预先分配好的 KV 空间、CUDA Graph、融合算子等，后面几节会逐一拆开。
+把采样循环做成真正的线上服务时，还有两个初学者极易踩坑的细节：
+
+### 5.1 什么时候停下来？（4 种停止条件）
+1. **遇到结束符（EOS Token）**：模型自己觉得话说完了。*避坑提示：现代模型（如 Qwen3、Llama-3）往往有多个结束符（例如 `<|endoftext|>` 和 `<|im_end|>`），必须从 `generation_config.json` 读取完整的 `eos_token_id` 列表！*
+2. **达到用户指定的 `max_tokens`**：生成的词数达到了预算上限。
+3. **达到模型最大上下文 `max_model_len`**：`输入长度 + 已生成长度` 触顶。
+4. **命中停止字符串（Stop Strings，如 `"\nObservation:"`）**：在 ReAct Agent 场景中常用，需要在反分词后的文本末尾实时匹配。
+   > **压测小技巧**：在做性能压测时，如果模型提前吐出 EOS 结束，不同框架生成的长度就不一样，没法公平对比吞吐。因此压测工具都会传 `ignore_eos=True`，强制模型忽略 EOS、严格跑满 `max_tokens` 步。
+
+### 5.2 为什么流式输出中文或 Emoji 时，不能“每出一个 Token 就直接 `decode`”？
+
+在 BPE（Byte-Pair Encoding）分词器中，一个生僻汉字或一个 Emoji 表情（UTF-8 编码占 3~4 个字节）往往会被拆成 **2 个甚至 3 个不同的 Token ID**！
+- 如果你在第 $t$ 步刚拿到半个汉字的 Token ID，就立刻调用 `tokenizer.decode([token_id])` 推给前端，因为字节不完整，Python 会输出一个刺眼的乱码替换符 **``（U+FFFD）**！
+- **正确的增量反分词做法**（参见本仓库 MiniServe 的 `IncrementalDetokenizer`）：维护已生成的完整 Token 列表，每次解码后若发现末尾字符是 `''`，就先扣留不发，等下一步剩下的半个字节 Token 到了、拼成完整汉字后再一起发给用户！
+
+---
+
+## 6. 动手实验：实测无缓存生成循环的耗时爬升曲线
+
+运行本节第 2 部分的 15 行代码（将循环次数设为 200，`eos_token_id` 判断暂时注释掉以跑满 200 步），然后打印第 1 步、第 50 步、第 100 步、第 200 步的单步耗时：
 
 ```python
-from vllm import LLM, SamplingParams
-llm = LLM(model="Qwen/Qwen2.5-0.5B", dtype="float16")
-out = llm.generate(["Write a short introduction about the US capital city."],
-                   SamplingParams(temperature=0.8, top_p=0.95, max_tokens=128))
-print(out[0].outputs[0].text)
+print(f"Step   1 耗时: {step_times[0]*1000:.2f} ms")
+print(f"Step  50 耗时: {step_times[49]*1000:.2f} ms")
+print(f"Step 100 耗时: {step_times[99]*1000:.2f} ms")
+print(f"Step 200 耗时: {step_times[199]*1000:.2f} ms")
 ```
 
-> [!WARNING]
-> 书中给出的"进阶配置"示例里有几项参数在当前 vLLM 中不存在或已改名，例如 `max_num_sequences`（实际为 `max_num_seqs`）、`max_sequence_length`、`enable_cuda_graph`（CUDA Graph 默认开启，用 `enforce_eager=True` 关闭）。以所装版本的 `vllm serve --help` 或 `EngineArgs` 为准。
+记下这组数字，马上在下一节（`1.3`）开启 KV Cache 后做同台对比！
 
-## 动手实验
+---
 
-运行第 2 节的代码，记录每个 token 的耗时，画出"token 序号 → 耗时"的折线图：
+## 7. 闯关自测
 
-| 观察项 | 结果 |
-|---|---|
-| 第 1 个 token 耗时 | |
-| 第 10 / 50 / 100 个 token 耗时 | |
-| 耗时随长度增长的形状（线性 / 更快） | |
-| 改用 `temperature=0`（贪心）后输出是否每次相同 | |
+<div class="llm-widget" data-widget="quiz" data-title="1.2 自回归生成 · 闯关自测" data-questions='[
+  {
+    "q": "在第 2 节手写的无缓存自回归循环中，假设初始 Prompt 长度为 s，当前正在生成第 k 个新词。这一步前向传播的线性层计算量与什么成正比？",
+    "options": [
+      "与常数 1 成正比（每步耗时恒定）",
+      "与当前序列总长度 (s + k) 成正比（Attention 部分甚至与 (s + k)² 成正比），因为每一步都把从头到尾的所有 Token 重新算了一遍",
+      "与词表大小 V 的平方成正比",
+      "随 k 增大而逐渐减小"
+    ],
+    "answer": 1,
+    "explain": "因为每次都执行 input_ids = torch.cat([input_ids, next_id], dim=1) 并把整个 input_ids 喂给模型，第 k 步输入的序列长度是 s + k，导致计算量随生成步数不断膨胀。"
+  },
+  {
+    "q": "在同一个 Batch 里，请求 A 要求 temperature=0（贪心解码），请求 B 要求 temperature=0.8 且 top_p=0.9。推理引擎在算出形状为 [2, V] 的 Logits 后，能不能在一次批处理里同时完成这两个请求的采样？",
+    "options": [
+      "不能，必须拆成两个进程分别运行",
+      "完全可以。采样操作只作用在最后输出的 [B, V] 二维张量上，按行应用各自的温度缩放与 Top-P 掩码截断，并将 temperature=0 的行直接替换为 argmax 结果即可",
+      "只有当两个请求的 Prompt 长度相同时才可以",
+      "必须把整个模型权重复制两份才能支持不同采样参数"
+    ],
+    "answer": 1,
+    "explain": "采样发生在 Transformer 全部层计算完毕之后的 [B, V] Logits 张量上，各行之间完全独立。你可以查看项目 1 MiniServe 的 LLMEngine._sample() 方法，里面用不到 30 行代码就优雅地实现了同一批次不同 temperature/top_k/top_p 的混合采样。"
+  },
+  {
+    "q": "开发流式 SSE 接口时，如果每生成一个 Token ID 就立刻单独调用 tokenizer.decode([new_id]) 推送给前端，在处理中文或 Emoji 时会出现什么现象？为什么？",
+    "options": [
+      "没有任何问题，所有字符都能正常显示",
+      "会出现乱码符号 ；因为一个 UTF-8 多字节字符（如生僻汉字或 Emoji）可能被 BPE 分词器拆成 2~3 个连续的 Token ID，单独解码半个字符的字节流是非法的",
+      "会导致 GPU 显存泄漏",
+      "会导致英文单词全部变成大写"
+    ],
+    "answer": 1,
+    "explain": "BPE 分词器在字节级别切分生僻字符。流式输出必须采用增量反分词（Incremental Detokenization）：当解码结果以替换符 \\ufffd () 结尾时暂缓发送，等后续字节 Token 拼齐后再输出。"
+  }
+]'></div>
 
-再把 prompt 换成 2000 token 左右的长文本，重复一次，比较曲线的斜率。
+---
 
-## 自测题
+## 延伸阅读与参考文献
 
-1. 在第 2 节的循环里，第 $k$ 步的前向计算量与哪些量有关？为什么耗时随 $k$ 增长？
-2. 贪心解码和 `temperature=0` 的采样有区别吗？框架通常怎么实现？
-3. 一个批里有的请求要 top-p=0.9、有的要贪心，采样能否一次完成？
-4. 流式输出中文时，如果每个 token 单独 `decode`，可能出现什么问题？
-
-<details>
-<summary>参考答案</summary>
-
-1. 第 $k$ 步输入长度是 $s + k$，线性层计算量正比于 $s + k$，注意力计算量正比于 $(s + k)^2$。所以耗时至少线性增长，长序列时更快。
-2. 数学上等价。框架一般把 $\tau = 0$ 单独处理为 argmax，避免除以 0。
-3. 可以。对整个 [B, V] 的 logits 按行应用各自的温度与 top-p 截断，再对每行采样；需要贪心的行用 argmax 的结果替换。
-4. 一个汉字的 UTF-8 编码可能分布在两个 token 中，单独解码会得到替换字符 `�`（显示为乱码），需要等后续 token 到达后再输出。
-
-</details>
-
-## 延伸阅读
-
-- Holtzman et al., *The Curious Case of Neural Text Degeneration*, ICLR 2020（top-p 采样）
-- 书中配套 notebook：`ch2_Workthrough_LLM_execution.ipynb`
+- Ari Holtzman et al., [*The Curious Case of Neural Text Degeneration*](https://arxiv.org/abs/1904.09751), ICLR 2020（提出 Top-P 核采样，解决贪心解码重复退化与高温采样胡言乱语的经典论文）
+- Chi Wang & Peiheng Hu, *Hands-On LLM Serving and Optimization*, O'Reilly, Chapter 2 (*The Autoregressive Nature of Transformers*)
