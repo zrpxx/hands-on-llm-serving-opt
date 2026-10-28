@@ -20,11 +20,13 @@ class BlockAllocator:
     def allocate(self) -> int:
         # TODO(1-3)：
         # 从空闲列表中取出一个物理块号；没有空闲块时抛出 RuntimeError。
+        # 分步指南第 1 步，测试：pytest tests/test_steps.py -k step01
         raise NotImplementedError("TODO(1-3): BlockAllocator.allocate")
 
     def free(self, blocks: List[int]):
         # TODO(1-3)：
         # 把一组块号放回空闲列表。
+        # 分步指南第 1 步，测试：pytest tests/test_steps.py -k step01
         raise NotImplementedError("TODO(1-3): BlockAllocator.free")
 
 

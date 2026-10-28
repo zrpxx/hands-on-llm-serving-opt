@@ -119,7 +119,7 @@ python tools/trace.py --impl solution --prompts 4,4,4 --arrive 1,1,3 --policy st
 6. 下一步它还在 `running` 中，差值为 1，就是 decode。
 7. 生成够了，`finish` 释放它的块，把它从 `running` 移除。
 
-整个调度的核心就是一个差值：**本步要处理的 token 数 = `num_tokens - num_computed_tokens`**，再受预算限制。新请求、切块中的 prefill、decode、被抢占后的恢复，都由这一个式子统一表达。
+整个调度的核心就是一个差值：本步要处理的 token 数等于 `num_tokens - num_computed_tokens`，再受预算限制。新请求、切块中的 prefill、decode、被抢占后的恢复，都由这一个式子统一表达。
 
 </details>
 
@@ -336,7 +336,7 @@ def _admit(self, budget: int, allow_partial: bool):
 <summary>答案</summary>
 
 1. decode（差值为 1）和 prompt 还没算完的切块 prefill（差值为剩余 prompt 长度）。用同一个差值公式即可，不需要区分。
-2. 它们已经占着 KV 块，用户已经在等后续 token；优先保证它们继续，TPOT 才稳定，已开始的请求不会饿死（1.6 节第 3 部分）。
+2. 它们已经占着 KV 块，用户已经在等后续 token；优先保证它们继续，TPOT 才稳定，已开始的请求也不会饿死（1.3 节“每一步的顺序”）。
 
 </details>
 
@@ -765,7 +765,7 @@ diff mine.txt ref.txt | head
 <details>
 <summary>答案</summary>
 
-1. 不能。`asyncio.Queue` 只能在它所属事件循环的线程里操作。要用 `loop.call_soon_threadsafe(q.put_nowait, item)`，让事件循环线程去执行（1.4 节第 2.3 部分）。
+1. 不能。`asyncio.Queue` 只能在它所属事件循环的线程里操作。要用 `loop.call_soon_threadsafe(q.put_nowait, item)`，让事件循环线程去执行（1.1 节）。
 2. 阻塞在 `self.inbox.get()` 上等待新命令，而不是空转反复调用 `step()`。
 3. `new_token_id` 为 `None` 的（切块 prefill 中间步，没有采样）；以及 `self.streams` 中找不到的（请求已被中止）。
 
@@ -869,7 +869,7 @@ hf download Qwen/Qwen3-0.6B --local-dir ~/models/Qwen3-0.6B
 PYTHONPATH=starter python -m miniserve.server --model ~/models/Qwen3-0.6B --port 8000 --max-model-len 4096
 ```
 
-启动日志中会打印显存测算结果和 KV 块数，记下来，项目页的实验 D 会用到。用聊天接口确认输出是正常的中文或英文：
+启动日志中会打印显存测算结果和 KV 块数，记下来，项目页的第 4 组实验会用到。用聊天接口确认输出是正常的中文或英文：
 
 ```bash
 curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' \
@@ -886,7 +886,7 @@ python bench.py --base-url http://localhost:8001 --num-prompts 64 --input-len 51
 python bench.py --base-url http://localhost:8000 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 16 --vocab-size 32000
 ```
 
-输出吞吐的比值就是项目完成标准中的"相对 HF 基线的倍数"。接下来回到 [项目 1 页面](stage1/boss-miniserve.md) 完成四组实验和报告。
+两者输出吞吐的比值，就是项目页第 1 组实验要报告的数字。接下来回到 [项目 1 页面](stage1/boss-miniserve.md) 完成四组实验和报告。
 
 ---
 

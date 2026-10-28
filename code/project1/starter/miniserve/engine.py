@@ -96,6 +96,8 @@ class LLMEngine:
                     seq_id: Optional[str] = None) -> Sequence:
         if len(prompt_token_ids) == 0:
             raise ValueError("prompt 不能为空")
+        if min(prompt_token_ids) < 0 or max(prompt_token_ids) >= self.model_cfg.vocab_size:
+            raise ValueError(f"prompt 中有超出词表范围 [0, {self.model_cfg.vocab_size}) 的 token id")
         if len(prompt_token_ids) >= self.cfg.max_model_len:
             raise ValueError(f"prompt 长度 {len(prompt_token_ids)} 超过 max_model_len={self.cfg.max_model_len}")
         if math.ceil(self.cfg.max_model_len / self.cfg.block_size) > self.num_blocks:
@@ -153,6 +155,7 @@ class LLMEngine:
         # 把调度结果展平成一次前向的输入：input_ids、positions、slot_mapping，
         # 以及 AttentionMetadata 中 prefill 与 decode 两组所需的槽位信息；同时记录哪些请求需要采样、取哪一行的 hidden。
         # 返回 (input_ids, positions, meta, sample_seqs, sample_rows)。
+        # 分步指南第 7 步，测试：pytest tests/test_steps.py -k step07
         raise NotImplementedError("TODO(1-3): LLMEngine._prepare_inputs")
 
     def _sample(self, logits: torch.Tensor, params: List[SamplingParams]) -> torch.Tensor:

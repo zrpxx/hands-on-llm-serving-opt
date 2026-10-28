@@ -135,7 +135,7 @@
     try {
       questions = JSON.parse(container.getAttribute('data-questions') || '[]');
     } catch (e) {
-      container.innerHTML = '<div class="lw-error">自测题数据格式有误（data-questions 不是合法 JSON）。</div>';
+      container.innerHTML = '<div class="lw-error">自测题数据格式有误：data-questions 不是合法 JSON。题目中的 $ 需要写成 &amp;#36;，否则会被公式插件提前替换。</div>';
       return;
     }
     const title = container.getAttribute('data-title') || '自测';
@@ -198,5 +198,15 @@
     render();
   });
 
-  window.LLMWidgets = { register, mountAll, formatNum, escapeHtml, color, renderMath };
+  /** 配色切换后重绘全部组件。组件里的定时器通过 data-gen 判断自己是否已过期。 */
+  function remountAll() {
+    document.querySelectorAll('.llm-widget[data-widget]').forEach((node) => {
+      node.dataset.gen = String(Number(node.dataset.gen || 0) + 1);
+      node.dataset.mounted = 'false';
+      node.innerHTML = '';
+    });
+    mountAll();
+  }
+
+  window.LLMWidgets = { register, mountAll, remountAll, formatNum, escapeHtml, color, renderMath };
 })();

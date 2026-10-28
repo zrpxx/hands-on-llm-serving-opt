@@ -80,8 +80,9 @@
     for (let i = 0; i < 6; i++) step();
     let timer = null;
     let visible = true;
+    const gen = container.dataset.gen;
     const start = () => { if (!timer) timer = setInterval(() => {
-      if (!document.body.contains(container)) { clearInterval(timer); return; }
+      if (!document.body.contains(container) || container.dataset.gen !== gen) { clearInterval(timer); return; }
       if (visible && !document.hidden) step();
     }, 650); };
     if ('IntersectionObserver' in window) {
@@ -92,8 +93,8 @@
 
   // ------------------------------------------------------------------ 课程地图
   const PART_INFO = {
-    0: { desc: '读懂 GPU 规格，估算权重与 KV Cache 的显存，用 Roofline 判断瓶颈，定义 TTFT、TPOT 与 Goodput。', written: true },
-    1: { desc: '从一次前向到一个在线服务：KV Cache、连续批处理、分页显存、前缀缓存与主流框架。', written: true },
+    0: { desc: '模型怎样逐个生成 token，KV Cache 为什么必要；再从 GPU 规格出发，估算显存、判断瓶颈，定义衡量服务的指标。', written: true },
+    1: { desc: '把模型变成在线服务：异步流式接口、连续批处理、分页 KV Cache、前缀缓存，以及主流框架的取舍。', written: true },
     2: { desc: '量化的原理与 GPTQ、AWQ、SmoothQuant、FP8，在精度、速度与显存之间取舍。', written: false },
     3: { desc: '注意力变体、FlashAttention、用 Triton 写算子、投机解码。', written: false },
     4: { desc: '张量 / 流水线 / 专家并行，Prefill-Decode 分离，KV 分层存储与缓存感知路由。', written: false },

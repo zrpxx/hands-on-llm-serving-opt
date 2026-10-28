@@ -96,6 +96,8 @@ class LLMEngine:
                     seq_id: Optional[str] = None) -> Sequence:
         if len(prompt_token_ids) == 0:
             raise ValueError("prompt 不能为空")
+        if min(prompt_token_ids) < 0 or max(prompt_token_ids) >= self.model_cfg.vocab_size:
+            raise ValueError(f"prompt 中有超出词表范围 [0, {self.model_cfg.vocab_size}) 的 token id")
         if len(prompt_token_ids) >= self.cfg.max_model_len:
             raise ValueError(f"prompt 长度 {len(prompt_token_ids)} 超过 max_model_len={self.cfg.max_model_len}")
         if math.ceil(self.cfg.max_model_len / self.cfg.block_size) > self.num_blocks:

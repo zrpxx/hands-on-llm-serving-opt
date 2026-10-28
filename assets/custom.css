@@ -5,21 +5,22 @@
    ========================================================================= */
 
 :root {
-  --paper: #fcfcfb;
-  --paper-2: #f3f4f6;
-  --paper-3: #e9ebef;
-  --ink: #1d2430;
-  --ink-2: #4a5464;
-  --ink-3: #7a8494;
-  --rule: #e1e4e9;
-  --rule-strong: #c9ced6;
+  --paper: #ffffff;
+  --paper-2: #f5f6f8;
+  --paper-3: #eaedf1;
+  --ink: #101317;        /* 标题 */
+  --text: #262b33;       /* 正文 */
+  --ink-2: #4c5563;
+  --ink-3: #78818e;
+  --rule: #e2e5ea;
+  --rule-strong: #c6ccd4;
 
-  --prefill: #2d50c4;
-  --prefill-ink: #1f3a94;
-  --prefill-soft: #e7ecfb;
-  --decode: #b97a0b;
-  --decode-ink: #8a5a06;
-  --decode-soft: #fbf1dd;
+  --prefill: #2448c8;
+  --prefill-ink: #1a3596;
+  --prefill-soft: #e9eefc;
+  --decode: #b5720a;
+  --decode-ink: #82510a;
+  --decode-soft: #fcf2de;
   --ok: #2f7d4f;
   --ok-soft: #e4f2e9;
   --err: #b73a3a;
@@ -30,9 +31,9 @@
   --series-3: #8566a3;
   --series-4: #9a6b4f;
 
-  --code-bg: #f4f5f7;
-  --code-ink: #26303d;
-  --term-bg: #1d2430;
+  --code-bg: #f5f6f8;
+  --code-ink: #232a34;
+  --term-bg: #1b1f26;
   --term-ink: #dfe4ec;
 
   --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
@@ -55,21 +56,22 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #171a20;
-  --paper-2: #1d2128;
-  --paper-3: #262b34;
-  --ink: #e3e6eb;
-  --ink-2: #b4bbc6;
-  --ink-3: #8a93a1;
-  --rule: #2c323c;
-  --rule-strong: #3b424e;
+  --paper: #15171b;
+  --paper-2: #1b1e23;
+  --paper-3: #272b32;
+  --ink: #f2f4f6;
+  --text: #d3d7dd;
+  --ink-2: #a7aeb9;
+  --ink-3: #7e8794;
+  --rule: #2a2e35;
+  --rule-strong: #3b4049;
 
-  --prefill: #8aa4f2;
-  --prefill-ink: #b3c4f7;
-  --prefill-soft: #222c47;
-  --decode: #e0ad4a;
-  --decode-ink: #f0c877;
-  --decode-soft: #3a2f1a;
+  --prefill: #8fa8ff;
+  --prefill-ink: #b8c7ff;
+  --prefill-soft: #1f2742;
+  --decode: #e9b14f;
+  --decode-ink: #f4ca7c;
+  --decode-soft: #33291a;
   --ok: #6cc394;
   --ok-soft: #1f3529;
   --err: #e88080;
@@ -80,9 +82,9 @@
   --series-3: #b49ad0;
   --series-4: #c99c80;
 
-  --code-bg: #1f232b;
+  --code-bg: #1c1f25;
   --code-ink: #d5dae2;
-  --term-bg: #12151a;
+  --term-bg: #0f1114;
   --term-ink: #d5dae2;
 }
 
@@ -90,7 +92,7 @@
 html, body { background: var(--paper); }
 body {
   font-family: var(--font-body);
-  color: var(--ink);
+  color: var(--text);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
@@ -103,7 +105,7 @@ body {
   max-width: var(--measure);
   padding: 24px 40px 48px;
   margin: 0 0 0 clamp(0px, 4vw, 64px);
-  color: var(--ink);
+  color: var(--text);
   line-height: 1.85;
   letter-spacing: 0.01em;
 }
@@ -143,7 +145,8 @@ body {
   font-weight: 650;
   margin: 1.6em 0 0.4em;
 }
-.markdown-section h1 a, .markdown-section h2 a, .markdown-section h3 a, .markdown-section h4 a {
+.markdown-section h1 a, .markdown-section h2 a, .markdown-section h3 a, .markdown-section h4 a,
+.markdown-section h5 a, .markdown-section h6 a, .anchor span {
   color: inherit !important;
   border: 0 !important;
   font-weight: inherit !important;
@@ -281,7 +284,7 @@ body {
   border: 0 !important;
   border-left: 3px solid var(--ink-3) !important;
   border-radius: 0 var(--radius) var(--radius) 0 !important;
-  color: var(--ink) !important;
+  color: var(--text) !important;
   padding: 0.8em 1.2em !important;
   margin: 1.5em 0 !important;
   font-size: 0.95rem;
@@ -432,7 +435,7 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
   margin: 0;
   right: 0;
   top: 0;
-  padding: 14px 32px 0 0;
+  padding: 16px 32px 0 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -458,16 +461,25 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
 .app-nav li ul a { padding: 4px 16px; font-size: 0.86rem; }
 .nav-gh { margin: 0 6px 0 12px; text-decoration: none; }
 .theme-toggle {
-  margin-left: 6px;
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
   font: 500 0.82rem var(--font-body);
   color: var(--ink-2);
-  background: transparent;
-  border: 1px solid var(--rule);
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
   border-radius: 999px;
-  padding: 3px 12px;
+  padding: 5px 12px 5px 10px;
 }
-.theme-toggle:hover { color: var(--ink); border-color: var(--rule-strong); }
+.theme-toggle svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.app-nav { padding-right: 104px !important; }
+@media (max-width: 768px) { .theme-toggle { top: auto; bottom: 14px; right: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.12); } }
 .github-corner { display: none; }
 
 /* ------------------------------------------------------------------ 页底 */
@@ -574,7 +586,7 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
 .lw-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 0; margin: 4px 0 14px; border-top: 1px solid var(--rule); }
 .lw-stat { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--rule); background: transparent; border-left: 0; }
 .lw-stat-label { font-size: 0.78rem; color: var(--ink-3); margin-bottom: 2px; }
-.lw-stat-value { font-family: var(--font-mono); font-size: 1.15rem; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.35; }
+.lw-stat-value { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.35; }
 .lw-stat-sub { font-size: 0.76rem; color: var(--ink-3); margin-top: 2px; }
 .lw-stat.ok .lw-stat-value { color: var(--ok); }
 .lw-stat.warn .lw-stat-value { color: var(--decode-ink); }

@@ -8,7 +8,7 @@
 |---|---|
 | `starter/miniserve/` | 待完成的骨架，关键函数标有 `TODO(1-x)` |
 | `solution/miniserve/` | 参考实现。建议自己完成后再对照 |
-| `baseline_hf.py` | Hugging Face 逐请求基线（步骤 1-1） |
+| `baseline_hf.py` | Hugging Face 逐个处理请求的基线，用于对比 |
 | `bench.py` | 压测客户端，适用于任意 OpenAI 兼容服务 |
 | `tools/make_tiny_model.py` | 生成随机初始化的微型 Qwen3，用于 CPU 上开发 |
 | `tests/test_steps.py` | 分步测试：每一步一组，`pytest tests/test_steps.py -k step03` |
@@ -32,7 +32,7 @@ PYTHONPATH=starter python -m miniserve.server --model /tmp/tiny --device cpu --n
 # GPU 上运行真实模型（先把模型下载到本地目录）
 PYTHONPATH=starter python -m miniserve.server --model /path/to/Qwen3-0.6B --port 8000
 
-# 压测
+# 压测。--vocab-size 是随机 token id 的上界：真实模型用 32000，微型模型的词表只有 400 多个，用 400
 python bench.py --base-url http://localhost:8000 --num-prompts 200 --input-len 512 --output-len 128 \
     --request-rate 8 --vocab-size 32000
 ```

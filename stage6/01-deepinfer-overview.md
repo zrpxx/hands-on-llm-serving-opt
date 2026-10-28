@@ -26,7 +26,7 @@ README 的定位是 DeepSeek 大规模线上服务所用的推理框架。这次
 |---|---|---|
 | **DSpark 投机解码** | 用 draft token 加速 decode，由置信度估计来安排什么时候做验证。`DEEPINFER_ENABLE_MTP_VARLEN=1` 开启，`DEEPINFER_USE_NEXTN_DECODE` 设最大草稿长度（默认 5） | 3.4 / 3.5 → [6.5](stage6/05-mtp-speculative.md) |
 | **SWA bounded replay** | prefill 时只重放输入的一段有界后缀；保留的长度要覆盖滑动窗口加上最大回溯长度（默认配置保留 140 个 token） | 3.1 → [6.6](stage6/06-long-context.md) |
-| **异步调度** | CPU 上的批调度与设备执行重叠，默认开启 | 1.5 / 1.6 → [6.8](stage6/08-async-scheduling.md) |
+| **异步调度** | CPU 上的批调度与设备执行重叠，默认开启 | 1.2 / 1.3 → [6.8](stage6/08-async-scheduling.md) |
 | **批不变 + 确定性采样** | `DEEPINFER_BATCH_INVARIANT=1` 保证不同批组合下结果一致；再关掉 MTP、固定 `seq_seed` 可得到确定性采样（仅 NVIDIA） | 5.6 → [6.7](stage6/07-batch-invariance.md) |
 | **EP + EPLB** | MoE 专家并行，配合专家负载均衡 | 4.2 → [6.3](stage6/03-wide-ep-eplb.md) |
 

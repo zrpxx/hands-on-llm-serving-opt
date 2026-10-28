@@ -3,7 +3,7 @@
 <div class="home-hero">
   <div>
     <h1 class="home-title">LLM Serving<br />实战教程</h1>
-    <p class="home-lede">以《Hands-On LLM Serving and Optimization》为主线，从一次前向计算推到一个能上线的推理服务：先算清显存和瓶颈，再亲手实现连续批处理与分页 KV Cache，最后对照 2026 年的生产框架。</p>
+    <p class="home-lede">以《Hands-On LLM Serving and Optimization》为主线，从一次前向计算讲到一个能上线的推理服务：先弄清模型怎样生成、显存和瓶颈怎样估算，再自己实现连续批处理与分页 KV Cache，最后对照 2026 年的生产系统。</p>
     <div class="home-actions">
       <a class="is-primary" data-resume href="#/stage0/01-serving-landscape">从 0.1 开始</a>
       <a href="#/stage1/project1-walkthrough">项目 1 分步指南</a>
@@ -17,11 +17,11 @@
 <div class="home-facts">
   <div>
     <h4>先推导，再看公式</h4>
-    <p>每个公式都先用 Qwen3-8B、A100 这样的具体数字算一遍。书中有误的地方单独标出。</p>
+    <p>每个公式都用 Qwen3-8B、A100 这样的具体数字算一遍。原书中有误的地方，在相应位置单独注明。</p>
   </div>
   <div>
     <h4>用组件验证直觉</h4>
-    <p>正文中的组件可以调参数：显存账本、Roofline 落点、批处理时间线、分页块分配。</p>
+    <p>正文中的组件可以调参数或逐步执行：显存账本、Roofline、批处理时间线、分页块分配、前缀缓存命中。</p>
   </div>
   <div>
     <h4>每节一组自测</h4>

@@ -27,8 +27,42 @@
 
   <script>
     var PROGRESS_KEY = 'llmopt-progress-v1';
+    // 2026-10 调整过第 0、1 部分的顺序，旧的进度记录按新路径迁移
+    var ROUTE_MOVES = {
+      'stage1/01-transformer-anatomy': 'stage0/02-transformer-anatomy',
+      'stage1/02-autoregressive-walkthrough': 'stage0/03-autoregressive-generation',
+      'stage1/03-kv-cache-prefill-decode': 'stage0/04-kv-cache-prefill-decode',
+      'stage0/02-gpu-specs': 'stage0/05-gpu-specs',
+      'stage0/03-memory-budget': 'stage0/06-memory-budget',
+      'stage0/04-roofline': 'stage0/07-roofline',
+      'stage0/05-metrics': 'stage0/08-metrics',
+      'stage1/04-serving-from-scratch': 'stage1/01-serving-from-scratch',
+      'stage1/05-continuous-batching': 'stage1/02-continuous-batching',
+      'stage1/06-vllm-internals': 'stage1/03-paged-attention-vllm',
+      'stage1/07-prefix-caching': 'stage1/04-prefix-caching',
+      'stage1/08-framework-comparison': 'stage1/05-framework-comparison',
+    };
+    // 旧链接跳转到新路径
+    function redirectMovedRoute() {
+      var m = location.hash.match(/^#\/([^?]+?)(\.md)?(\?.*)?$/);
+      if (m && ROUTE_MOVES[m[1]]) location.replace('#/' + ROUTE_MOVES[m[1]] + (m[3] || ''));
+    }
+    redirectMovedRoute();
+    window.addEventListener('hashchange', redirectMovedRoute);
+
     function loadProgress() {
-      try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+      var p = {};
+      try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+      try {
+        if (!localStorage.getItem('llmopt-progress-migrated-1')) {
+          var out = {};
+          Object.keys(p).forEach(function (k) { out[ROUTE_MOVES[k] || k] = p[k]; });
+          p = out;
+          localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+          localStorage.setItem('llmopt-progress-migrated-1', '1');
+        }
+      } catch (e) {}
+      return p;
     }
     function saveProgress(p) {
       try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) {}
@@ -78,7 +112,7 @@
       markdown: {
         renderer: {
           code: function (code, lang) {
-            if (lang === 'mermaid') return '<div class="mermaid">' + code + '</div>';
+            if (lang === 'mermaid') return '<div class="mermaid" data-src="' + encodeURIComponent(code) + '">' + code + '</div>';
             return this.origin.code.apply(this, arguments);
           },
         },
@@ -160,33 +194,28 @@
           });
         },
 
-        // 导航栏：GitHub 链接与配色切换
+        // 配色切换：固定在右上角，不依赖导航栏（导航栏会在加载 _navbar.md 后整体重绘）
         function (hook) {
-          hook.mounted(function () {
-            var nav = document.querySelector('.app-nav');
-            if (!nav || nav.querySelector('.theme-toggle')) return;
-            var gh = document.createElement('a');
-            gh.className = 'nav-gh';
-            gh.href = 'https://github.com/zrpxx/hands-on-llm-serving-opt';
-            gh.target = '_blank';
-            gh.rel = 'noopener';
-            gh.textContent = 'GitHub';
+          hook.doneEach(function () {
+            if (document.querySelector('.theme-toggle')) return;
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'theme-toggle';
             function label() {
               var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-              btn.textContent = dark ? '浅色' : '深色';
-              btn.setAttribute('aria-label', dark ? '切换到浅色模式' : '切换到深色模式');
+              btn.innerHTML = dark
+                ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg><span>浅色</span>'
+                : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z"/></svg><span>深色</span>';
+              btn.setAttribute('aria-label', dark ? '切换到浅色' : '切换到深色');
+              btn.title = btn.getAttribute('aria-label');
             }
             label();
+            btn.refresh = label;
             btn.onclick = function () {
               var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-              try { localStorage.setItem('llmopt-theme', next); } catch (e) {}
-              location.reload();      // 图表在初始化时读取配色，重新加载最简单可靠
+              window.LLMTheme.set(next);
             };
-            nav.appendChild(gh);
-            nav.appendChild(btn);
+            document.body.appendChild(btn);
           });
         },
 
@@ -202,8 +231,8 @@
 
   <script src="assets/widgets/core.js"></script>
   <script src="assets/widgets/home.js"></script>
-  <script src="assets/widgets/stage0.js"></script>
-  <script src="assets/widgets/stage1.js"></script>
+  <script src="assets/widgets/basics.js"></script>
+  <script src="assets/widgets/serving.js"></script>
 
   <script src="assets/vendor/docsify.min.js"></script>
   <script src="assets/vendor/search.min.js"></script>
@@ -218,44 +247,84 @@
   <script src="assets/vendor/mermaid.min.js"></script>
   <script>
     (function () {
-      var css = getComputedStyle(document.documentElement);
-      var v = function (n) { return css.getPropertyValue(n).trim(); };
-      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: 'base',
-        darkMode: dark,
-        fontFamily: v('--font-body'),
-        themeVariables: {
-          fontSize: '14px',
-          background: v('--paper'),
-          primaryColor: v('--prefill-soft'),
-          primaryBorderColor: v('--prefill'),
-          primaryTextColor: v('--ink'),
-          secondaryColor: v('--decode-soft'),
-          secondaryBorderColor: v('--decode'),
-          tertiaryColor: v('--paper-2'),
-          tertiaryBorderColor: v('--rule'),
-          lineColor: v('--ink-3'),
-          textColor: v('--ink'),
-          clusterBkg: v('--paper-2'),
-          clusterBorder: v('--rule'),
-          noteBkgColor: v('--decode-soft'),
-          noteBorderColor: v('--decode'),
-          actorBkg: v('--prefill-soft'),
-          actorBorder: v('--prefill'),
-          signalColor: v('--ink-2'),
-          taskBkgColor: v('--prefill-soft'),
-          taskBorderColor: v('--prefill'),
-          taskTextColor: v('--ink'),
-          taskTextDarkColor: v('--ink'),
-          critBkgColor: v('--decode-soft'),
-          critBorderColor: v('--decode'),
-          gridColor: v('--rule'),
-          sectionBkgColor: v('--paper-2'),
-          altSectionBkgColor: v('--paper'),
+      function initMermaid() {
+        var css = getComputedStyle(document.documentElement);
+        var v = function (n) { return css.getPropertyValue(n).trim(); };
+        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'base',
+          darkMode: dark,
+          fontFamily: v('--font-body'),
+          themeVariables: {
+            fontSize: '14px',
+            background: v('--paper'),
+            primaryColor: v('--prefill-soft'),
+            primaryBorderColor: v('--prefill'),
+            primaryTextColor: v('--ink'),
+            secondaryColor: v('--decode-soft'),
+            secondaryBorderColor: v('--decode'),
+            tertiaryColor: v('--paper-2'),
+            tertiaryBorderColor: v('--rule-strong'),
+            lineColor: v('--ink-3'),
+            textColor: v('--ink'),
+            clusterBkg: v('--paper-2'),
+            clusterBorder: v('--rule-strong'),
+            noteBkgColor: v('--decode-soft'),
+            noteBorderColor: v('--decode'),
+            noteTextColor: v('--ink'),
+            actorBkg: v('--prefill-soft'),
+            actorBorder: v('--prefill'),
+            actorTextColor: v('--ink'),
+            signalColor: v('--ink-2'),
+            signalTextColor: v('--ink'),
+            labelTextColor: v('--ink'),
+            loopTextColor: v('--ink'),
+            edgeLabelBackground: v('--paper'),
+            taskBkgColor: v('--prefill-soft'),
+            taskBorderColor: v('--prefill'),
+            taskTextColor: v('--ink'),
+            taskTextDarkColor: v('--ink'),
+            taskTextOutsideColor: v('--ink'),
+            critBkgColor: v('--decode-soft'),
+            critBorderColor: v('--decode'),
+            gridColor: v('--rule'),
+            sectionBkgColor: v('--paper-2'),
+            altSectionBkgColor: v('--paper'),
+          },
+        });
+      }
+      initMermaid();
+
+      // 无刷新切换配色：重设 CSS 变量后，重绘 Mermaid 图与交互组件（它们在绘制时读取颜色）
+      // 用户没有手动选择时，跟随系统配色变化
+      if (window.matchMedia) {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var onChange = function (e) {
+          var saved = null;
+          try { saved = localStorage.getItem('llmopt-theme'); } catch (err) {}
+          if (saved) return;
+          window.LLMTheme.set(e.matches ? 'dark' : 'light', true);
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onChange);
+      }
+
+      window.LLMTheme = {
+        set: function (theme, fromSystem) {
+          document.documentElement.setAttribute('data-theme', theme);
+          if (!fromSystem) { try { localStorage.setItem('llmopt-theme', theme); } catch (e) {} }
+          var tb = document.querySelector('.theme-toggle');
+          if (tb && tb.refresh) tb.refresh();
+          initMermaid();
+          var nodes = document.querySelectorAll('.markdown-section .mermaid[data-src]');
+          nodes.forEach(function (n) {
+            n.removeAttribute('data-processed');
+            n.innerHTML = decodeURIComponent(n.getAttribute('data-src'));
+          });
+          if (nodes.length) { try { mermaid.run({ nodes: nodes }); } catch (e) {} }
+          if (window.LLMWidgets && window.LLMWidgets.remountAll) window.LLMWidgets.remountAll();
         },
-      });
+      };
     })();
   </script>
   <script src="assets/vendor/prism/prism-bash.min.js"></script>

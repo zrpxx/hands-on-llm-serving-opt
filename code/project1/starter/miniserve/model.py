@@ -81,6 +81,7 @@ class Attention(nn.Module):
         # 3) decode 组：按 meta.decode_slots 取出 [B, max_ctx] 的 K、V，用 meta.decode_mask 屏蔽 padding，一次算完
         # 4) 把结果按行号写回 out（形状 [T, n_q, d]）
         out = torch.empty_like(q)
+        # 分步指南第 8 步，测试：pytest tests/test_steps.py -k step08
         raise NotImplementedError("TODO(1-3): Attention.forward 中的分页注意力")
 
         return self.o_proj(out.reshape(T, self.n_q * self.d))
