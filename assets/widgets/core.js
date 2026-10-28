@@ -87,13 +87,30 @@
     obs.observe(node, { childList: true, subtree: true, characterData: true });
   }
 
+  let retried = false;
+  function loadMissing() {
+    if (retried) return;
+    retried = true;
+    const files = ['basics.js', 'serving.js'];
+    let left = files.length;
+    files.forEach((f) => {
+      if (document.querySelector(`script[src^="assets/widgets/${f}"]`)) { if (--left === 0) remountAll(); return; }
+      const s = document.createElement('script');
+      s.src = `assets/widgets/${f}?v=${Date.now()}`;
+      s.onload = s.onerror = () => { if (--left === 0) remountAll(); };
+      document.body.appendChild(s);
+    });
+  }
+
   function mountAll() {
     document.querySelectorAll('.llm-widget[data-widget]').forEach((node) => {
       if (node.dataset.mounted === 'true') return;
       const name = node.dataset.widget;
       const renderFn = registry[name];
       if (!renderFn) {
-        node.innerHTML = `<div class="lw-error">组件 <code>${escapeHtml(name)}</code> 没有加载，请检查 index.html 中的脚本引用。</div>`;
+        // 常见原因：浏览器用了缓存里的旧 index.html，没有引用新的组件脚本。尝试补加载一次。
+        loadMissing();
+        node.innerHTML = `<div class="lw-error">组件 <code>${escapeHtml(name)}</code> 没有加载。如果刷新后仍然出现，请强制刷新页面（macOS：Cmd + Shift + R；Windows：Ctrl + F5）以清除缓存。</div>`;
         return;
       }
       try {
