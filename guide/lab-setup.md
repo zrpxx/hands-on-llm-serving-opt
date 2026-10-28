@@ -8,7 +8,7 @@
 
 | 硬件档位 | 典型配置 | 可完成的教程内容 | 租用/使用建议 |
 |---|---|---|---|
-| **零 GPU（纯 CPU / Mac）** | 任意笔记本（8GB+ 内存） | 全部交互式沙盒、`code/stage0/estimate_memory.py`、**项目 1 MiniServe 全部代码实现与 `pytest` 正确性测试** | 日常看教程、写代码、跑单元测试首选 |
+| **零 GPU（纯 CPU / Mac）** | 任意笔记本（8GB+ 内存） | 全部交互组件、`code/stage0/estimate_memory.py`、**项目 1 MiniServe 全部代码实现与 `pytest` 正确性测试** | 日常看教程、写代码、跑单元测试首选 |
 | **入门单卡（24 GB 显存）** | RTX 4090 / 3090 / NVIDIA A10 / L4 | 第 0、1 部分全部 GPU 实验（使用 `Qwen3-0.6B` 或量化后的 `8B`）、项目 1 GPU 压测、项目 2 量化评测 | 云平台按量租用约 ¥1.5~3 / 小时 |
 | **标准单卡（48~80 GB 显存）** | L40S (48GB) / A100 / A800 / H100 (80GB) | 全精度 `Qwen3-8B` / `14B` 高并发压测、项目 3 Triton 算子与投机采样 | 跑正式压测曲线时租用 2~3 小时即可 |
 | **多卡环境（≥ 2× GPU）** | 2× A10 / 2× A100 / 8× H200 | 第 4 部分（TP/PP/DP 对比、PD 分离）、项目 4 Cluster Commander | 仅在做第 4 部分时按需开启 |
@@ -79,7 +79,7 @@ python code/project1/tools/make_tiny_model.py --out /tmp/tiny --layers 4 --hidde
 MINISERVE_IMPL=solution pytest -q code/project1/tests
 ```
 
-看到 `passed` 输出，说明你的本地代码环境已经完全就绪！
+看到 `passed` 输出，说明你的本地代码环境已经完全就绪。
 
 ### 4.2 GPU 环境第一次启动 vLLM
 
@@ -102,4 +102,4 @@ curl http://localhost:8000/v1/chat/completions \
   }'
 ```
 
-收到模型返回的 JSON 响应后，恭喜你完成了环境准备！接下来请进入 [0.1 模型服务概览](stage0/01-serving-landscape.md)。
+收到模型返回的 JSON 响应后，恭喜你完成了环境准备。接下来请进入 [0.1 模型服务概览](stage0/01-serving-landscape.md)。

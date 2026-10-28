@@ -2,165 +2,157 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>Hands-On LLM Serving & Optimization 交互式实战教程</title>
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
-  <meta name="description" content="从零构建高性能大模型推理系统：原理图解、交互沙盒、手写推理引擎与 2026 生产推理实践" />
-
-  <!-- 主题：vue（亮色）。如果喜欢暗色，把 vue.css 换成 dark.css -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/themes/vue.css" />
-  <!-- KaTeX：Attention / Roofline / 量化公式都要用 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <title>LLM Serving 实战教程</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="基于《Hands-On LLM Serving and Optimization》的大模型推理服务自学教程：原理推导、交互组件、手写推理引擎与 2026 年生产实践" />
+  <meta name="color-scheme" content="light dark" />
+  <script>
+    // 在首次绘制前确定配色，避免闪烁。优先用户选择，其次跟随系统
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('llmopt-theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <!-- 所有依赖都托管在仓库内（assets/vendor），不依赖外部 CDN 与网络字体 -->
+  <link rel="stylesheet" href="assets/vendor/docsify-vue.css" />
+  <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
   <link rel="stylesheet" href="assets/custom.css" />
 </head>
 <body>
-  <div id="app">加载中……</div>
+  <div id="app">加载中…</div>
 
   <script>
+    var PROGRESS_KEY = 'llmopt-progress-v1';
+    function loadProgress() {
+      try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function saveProgress(p) {
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+
     window.$docsify = {
       name: 'LLM Serving 实战教程',
-      repo: 'https://github.com/zrpxx/hands-on-llm-serving-opt',
+      nameLink: '#/',
       homepage: 'README.md',
-
-      // ── 封面 & 导航 ─────────────────────────────
-      coverpage: true,                // 读取 _coverpage.md
-      onlyCover: false,
-      loadNavbar: true,               // 读取 _navbar.md
-      mergeNavbar: true,              // 小屏时把导航栏并入侧边栏
-
-      // ── 侧边栏 ─────────────────────────────────
+      coverpage: false,
+      loadNavbar: true,
+      mergeNavbar: true,
       loadSidebar: true,
-      alias: {                        // 所有子目录共用根目录的侧边栏 / 导航栏
+      alias: {
         '/.*/_sidebar.md': '/_sidebar.md',
         '/.*/_navbar.md': '/_navbar.md',
       },
-      subMaxLevel: 3,                 // 当前页 h2/h3 自动展开为子目录
+      subMaxLevel: 2,
       maxLevel: 4,
       auto2top: true,
-      topMargin: 64,                  // 锚点跳转时为顶部留白
+      topMargin: 72,
       relativePath: false,
       notFoundPage: '_404.md',
       executeScript: true,
 
-      // ── 搜索 ───────────────────────────────────
       search: {
         maxAge: 86400000,
         paths: 'auto',
-        placeholder: '搜索教程章节、概念或算子',
-        noData: '没找到，换个关键词试试',
+        placeholder: '搜索章节、概念或参数',
+        noData: '没有找到相关内容',
         depth: 3,
-        hideOtherSidebarContent: false,
       },
-
-      // ── 一键复制 ───────────────────────────────
-      copyCode: {
-        buttonText: '复制',
-        errorText: '复制失败',
-        successText: '已复制',
-      },
-
-      // ── 上一节 / 下一节 ─────────────────────────
-      pagination: {
-        previousText: '上一节',
-        nextText: '下一节',
-        crossChapter: true,
-        crossChapterText: true,
-      },
-
-      // ── 字数统计 & 阅读时间 ─────────────────────
+      copyCode: { buttonText: '复制', errorText: '复制失败', successText: '已复制' },
+      pagination: { previousText: '上一节', nextText: '下一节', crossChapter: true, crossChapterText: true },
       count: {
-        countable: true,
-        position: 'top',
-        margin: '10px',
-        float: 'right',
-        fontsize: '0.85em',
-        color: 'var(--theme-color)',
-        language: 'chinese',
-        localization: { words: '', minute: '' },
-        isExpected: true,
+        countable: true, position: 'top', margin: '0', float: 'right', fontsize: '0.8em',
+        color: 'var(--ink-3)', language: 'chinese', localization: { words: ' 字', minute: ' 分钟' }, isExpected: true,
       },
-
-      // ── 代码 Tabs（同一实验的 vLLM / SGLang / TRT-LLM 写法并排）
-      tabs: {
-        persist: true,
-        sync: true,
-        theme: 'classic',
-        tabComments: true,
-        tabHeadings: true,
-      },
-
-      // ── 提示块：> [!NOTE] / [!TIP] / [!WARNING] / [!ATTENTION]
+      tabs: { persist: true, sync: true, theme: 'classic', tabComments: true, tabHeadings: true },
       'flexible-alerts': {
         style: 'flat',
         note: { label: '说明' },
         tip: { label: '技巧' },
         warning: { label: '注意' },
-        attention: { label: '避坑' },
+        attention: { label: '易错点' },
       },
-
-      // ── Mermaid：架构图 / 时序图直接写在 markdown 里
       markdown: {
         renderer: {
           code: function (code, lang) {
-            if (lang === 'mermaid') {
-              return '<div class="mermaid">' + code + '</div>';
-            }
+            if (lang === 'mermaid') return '<div class="mermaid">' + code + '</div>';
             return this.origin.code.apply(this, arguments);
           },
         },
       },
 
       plugins: [
-        // Mermaid 渲染 + 交互式组件挂载
-        function (hook) {
+        // 主页使用独立版式；其余页面在标题下方显示"本节对应书中…"等元信息
+        function (hook, vm) {
           hook.doneEach(function () {
-            if (window.mermaid) {
-              try { window.mermaid.run({ querySelector: '.mermaid' }); } catch (e) {}
-            }
-            if (window.LLMWidgets && typeof window.LLMWidgets.mountAll === 'function') {
-              window.LLMWidgets.mountAll();
-            }
+            var isHome = vm.route.path === '/' || vm.route.path === '/README';
+            document.body.classList.toggle('is-home', isHome);
           });
         },
 
-        // 进度打卡：每页底部一个「标记本节已完成」按钮，进度存在本地浏览器
+        // Mermaid 与交互组件
+        function (hook) {
+          hook.doneEach(function () {
+            if (window.mermaid) {
+              try { window.mermaid.run({ querySelector: '.markdown-section .mermaid' }); } catch (e) {}
+            }
+            if (window.LLMWidgets) window.LLMWidgets.mountAll();
+          });
+        },
+
+        // 学习进度：页底打卡、侧边栏标记、每部分完成数
         function (hook, vm) {
-          var KEY = 'llmopt-progress-v1';
-          function load() {
-            try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; }
-          }
-          function save(p) {
-            try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {}
+          function routeOf(href) {
+            return (href || '').replace(/^#\//, '').replace(/\.md$/, '');
           }
           function paintSidebar() {
-            var p = load();
+            var p = loadProgress();
             document.querySelectorAll('.sidebar-nav a').forEach(function (a) {
               var raw = a.getAttribute('href') || '';
-              if (raw.indexOf('?id=') !== -1) return;   // 跳过页内小标题锚点
-              var href = raw.replace(/^#\//, '');
-              a.classList.toggle('is-cleared', !!p[href]);
+              if (raw.indexOf('?id=') !== -1) return;
+              a.classList.toggle('is-cleared', !!p[routeOf(raw)]);
+            });
+            document.querySelectorAll('.sidebar-nav > ul > li').forEach(function (li) {
+              var head = li.querySelector(':scope > p, :scope > strong');
+              var links = li.querySelectorAll(':scope > ul > li > a');
+              if (!head || !links.length) return;
+              var done = 0;
+              links.forEach(function (a) { if (p[routeOf(a.getAttribute('href'))]) done++; });
+              var tag = head.querySelector('.part-progress');
+              if (!tag) {
+                tag = document.createElement('span');
+                tag.className = 'part-progress';
+                head.appendChild(tag);
+              }
+              tag.textContent = done + '/' + links.length;
+              tag.classList.toggle('is-full', done === links.length);
             });
           }
+          window.LLMProgress = { load: loadProgress, paint: paintSidebar };
+
           hook.afterEach(function (html) {
             var path = vm.route.path.replace(/^\//, '');
-            if (!path || path === 'README' || path === '') return html;
-            var done = !!load()[path];
+            if (!path || path === 'README') return html;
+            var done = !!loadProgress()[path];
             return html +
-              '<div class="clear-box">' +
-              '<button class="clear-btn' + (done ? ' done' : '') + '" data-path="' + path + '">' +
-              (done ? '已完成本节学习（点击撤销）' : '标记本节已完成') +
-              '</button></div>';
+              '<div class="clear-box"><button type="button" class="clear-btn' + (done ? ' done' : '') +
+              '" data-path="' + path + '" aria-pressed="' + done + '">' +
+              (done ? '已完成本节' : '标记本节已完成') + '</button></div>';
           });
           hook.doneEach(function () {
             var btn = document.querySelector('.clear-btn');
             if (btn) {
               btn.onclick = function () {
-                var p = load(), k = btn.dataset.path;
-                if (p[k]) { delete p[k]; } else { p[k] = Date.now(); }
-                save(p);
+                var p = loadProgress(), k = btn.dataset.path;
+                if (p[k]) delete p[k]; else p[k] = Date.now();
+                saveProgress(p);
                 var done = !!p[k];
                 btn.classList.toggle('done', done);
-                btn.textContent = done ? '已完成本节学习（点击撤销）' : '标记本节已完成';
+                btn.setAttribute('aria-pressed', done);
+                btn.textContent = done ? '已完成本节' : '标记本节已完成';
                 paintSidebar();
               };
             }
@@ -168,52 +160,112 @@
           });
         },
 
-        // 页脚
+        // 导航栏：GitHub 链接与配色切换
+        function (hook) {
+          hook.mounted(function () {
+            var nav = document.querySelector('.app-nav');
+            if (!nav || nav.querySelector('.theme-toggle')) return;
+            var gh = document.createElement('a');
+            gh.className = 'nav-gh';
+            gh.href = 'https://github.com/zrpxx/hands-on-llm-serving-opt';
+            gh.target = '_blank';
+            gh.rel = 'noopener';
+            gh.textContent = 'GitHub';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'theme-toggle';
+            function label() {
+              var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+              btn.textContent = dark ? '浅色' : '深色';
+              btn.setAttribute('aria-label', dark ? '切换到浅色模式' : '切换到深色模式');
+            }
+            label();
+            btn.onclick = function () {
+              var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+              try { localStorage.setItem('llmopt-theme', next); } catch (e) {}
+              location.reload();      // 图表在初始化时读取配色，重新加载最简单可靠
+            };
+            nav.appendChild(gh);
+            nav.appendChild(btn);
+          });
+        },
+
         function (hook) {
           hook.afterEach(function (html) {
-            return html + '<footer class="site-footer">Hands-On LLM Serving &amp; Optimization 交互式实战教程 · 结合 <em>Hands-On LLM Serving and Optimization</em> (O\'Reilly) 与 2026 生产推理框架源码</footer>';
+            return html + '<footer class="site-footer">内容基于 <em>Hands-On LLM Serving and Optimization</em>（O\'Reilly）与公开的推理框架源码、论文整理。' +
+              '<a href="https://github.com/zrpxx/hands-on-llm-serving-opt" target="_blank" rel="noopener">在 GitHub 上查看源文件</a></footer>';
           });
         },
       ],
     };
   </script>
 
-  <!-- 交互式控件库 -->
   <script src="assets/widgets/core.js"></script>
+  <script src="assets/widgets/home.js"></script>
   <script src="assets/widgets/stage0.js"></script>
   <script src="assets/widgets/stage1.js"></script>
 
-  <!-- Docsify 核心 -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js"></script>
-
-  <!-- 官方插件：搜索 / 图片缩放 -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js"></script>
-
-  <!-- 社区插件 -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2.1.1/dist/docsify-copy-code.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2.10.1/dist/docsify-pagination.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-count@1.1.0/dist/countable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1.6.3/dist/docsify-tabs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-plugin-flexible-alerts@1.1.1/dist/docsify-plugin-flexible-alerts.min.js"></script>
-
-  <!-- 公式 -->
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-katex@1.4.4/dist/docsify-katex.js"></script>
-
-  <!-- 图表 -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
-  <script>mermaid.initialize({ startOnLoad: false, theme: 'neutral' });</script>
-
-  <!-- 代码高亮：Prism 语言包（docsify 自带 Prism 核心，这里补齐语言） -->
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-toml.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-diff.min.js"></script>
+  <script src="assets/vendor/docsify.min.js"></script>
+  <script src="assets/vendor/search.min.js"></script>
+  <script src="assets/vendor/zoom-image.min.js"></script>
+  <script src="assets/vendor/docsify-copy-code.min.js"></script>
+  <script src="assets/vendor/docsify-pagination.min.js"></script>
+  <script src="assets/vendor/countable.min.js"></script>
+  <script src="assets/vendor/docsify-tabs.min.js"></script>
+  <script src="assets/vendor/docsify-plugin-flexible-alerts.min.js"></script>
+  <script src="assets/vendor/katex/katex.min.js"></script>
+  <script src="assets/vendor/docsify-katex.js"></script>
+  <script src="assets/vendor/mermaid.min.js"></script>
+  <script>
+    (function () {
+      var css = getComputedStyle(document.documentElement);
+      var v = function (n) { return css.getPropertyValue(n).trim(); };
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        darkMode: dark,
+        fontFamily: v('--font-body'),
+        themeVariables: {
+          fontSize: '14px',
+          background: v('--paper'),
+          primaryColor: v('--prefill-soft'),
+          primaryBorderColor: v('--prefill'),
+          primaryTextColor: v('--ink'),
+          secondaryColor: v('--decode-soft'),
+          secondaryBorderColor: v('--decode'),
+          tertiaryColor: v('--paper-2'),
+          tertiaryBorderColor: v('--rule'),
+          lineColor: v('--ink-3'),
+          textColor: v('--ink'),
+          clusterBkg: v('--paper-2'),
+          clusterBorder: v('--rule'),
+          noteBkgColor: v('--decode-soft'),
+          noteBorderColor: v('--decode'),
+          actorBkg: v('--prefill-soft'),
+          actorBorder: v('--prefill'),
+          signalColor: v('--ink-2'),
+          taskBkgColor: v('--prefill-soft'),
+          taskBorderColor: v('--prefill'),
+          taskTextColor: v('--ink'),
+          taskTextDarkColor: v('--ink'),
+          critBkgColor: v('--decode-soft'),
+          critBorderColor: v('--decode'),
+          gridColor: v('--rule'),
+          sectionBkgColor: v('--paper-2'),
+          altSectionBkgColor: v('--paper'),
+        },
+      });
+    })();
+  </script>
+  <script src="assets/vendor/prism/prism-bash.min.js"></script>
+  <script src="assets/vendor/prism/prism-python.min.js"></script>
+  <script src="assets/vendor/prism/prism-c.min.js"></script>
+  <script src="assets/vendor/prism/prism-cpp.min.js"></script>
+  <script src="assets/vendor/prism/prism-json.min.js"></script>
+  <script src="assets/vendor/prism/prism-yaml.min.js"></script>
+  <script src="assets/vendor/prism/prism-docker.min.js"></script>
+  <script src="assets/vendor/prism/prism-toml.min.js"></script>
+  <script src="assets/vendor/prism/prism-diff.min.js"></script>
 </body>
 </html>

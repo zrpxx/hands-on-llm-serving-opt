@@ -1,7 +1,10 @@
 /**
- * Core Interactive Widget Engine for Hands-On LLM Serving & Optimization Tutorial
- * Provides declarative mounting (<div class="llm-widget" data-widget="..."></div>),
- * reusable UI controls, and the interactive self-check quiz widget.
+ * 交互组件的公共部分。
+ *
+ * 用法：在 Markdown 中写 <div class="llm-widget" data-widget="名称" ...></div>，
+ * 页面渲染完成后由 index.html 调用 LLMWidgets.mountAll() 挂载。
+ *
+ * 组件内的文本可以写 $...$ 公式，挂载和每次重绘后都会自动用 KaTeX 渲染。
  */
 (function () {
   const registry = {};
@@ -12,9 +15,7 @@
 
   function formatNum(n, digits = 1) {
     if (n === null || n === undefined || Number.isNaN(n)) return '-';
-    if (Math.abs(n) >= 1000) {
-      return Number(n.toFixed(digits)).toLocaleString('en-US');
-    }
+    if (Math.abs(n) >= 1000) return Number(n.toFixed(digits)).toLocaleString('en-US');
     return Number(n.toFixed(digits)).toString();
   }
 
@@ -26,99 +27,169 @@
       .replace(/"/g, '&quot;');
   }
 
-  function mountAll() {
-    const nodes = document.querySelectorAll('.llm-widget[data-widget]');
+  /** 读取 CSS 设计令牌，例如 color('prefill') -> '#2d50c4' */
+  function color(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim();
+  }
+
+  // ------------------------------------------------------------------ 组件内公式
+  const MATH_RE = /\$([^$\n]+?)\$/g;
+
+  function renderMath(root) {
+    if (!window.katex) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || node.nodeValue.indexOf('$') === -1) return NodeFilter.FILTER_REJECT;
+        const p = node.parentNode;
+        if (!p || p.closest('code, pre, .katex, script, style, textarea, input')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach((node) => {
+      const text = node.nodeValue;
+      MATH_RE.lastIndex = 0;
+      if (!MATH_RE.test(text)) return;
+      MATH_RE.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      let m;
+      while ((m = MATH_RE.exec(text))) {
+        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const span = document.createElement('span');
+        try {
+          window.katex.render(m[1], span, { throwOnError: false });
+        } catch (e) {
+          span.textContent = m[0];
+        }
+        frag.appendChild(span);
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
+  function watchMath(node) {
+    renderMath(node);
+    let pending = false;
+    const obs = new MutationObserver(() => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        obs.disconnect();
+        renderMath(node);
+        obs.observe(node, { childList: true, subtree: true, characterData: true });
+      });
+    });
+    obs.observe(node, { childList: true, subtree: true, characterData: true });
+  }
+
+  function mountAll() {
+    document.querySelectorAll('.llm-widget[data-widget]').forEach((node) => {
       if (node.dataset.mounted === 'true') return;
       const name = node.dataset.widget;
       const renderFn = registry[name];
       if (!renderFn) {
-        node.innerHTML = `<div class="lw-error">交互组件 <code>${escapeHtml(name)}</code> 尚未加载</div>`;
+        node.innerHTML = `<div class="lw-error">组件 <code>${escapeHtml(name)}</code> 没有加载，请检查 index.html 中的脚本引用。</div>`;
         return;
       }
       try {
         node.dataset.mounted = 'true';
         renderFn(node);
+        watchMath(node);
       } catch (err) {
-        console.error('[LLMWidgets] Failed to mount widget:', name, err);
-        node.innerHTML = `<div class="lw-error">组件渲染异常：${escapeHtml(err.message)}</div>`;
+        console.error('[LLMWidgets]', name, err);
+        node.innerHTML = `<div class="lw-error">组件 ${escapeHtml(name)} 渲染出错：${escapeHtml(err.message)}</div>`;
       }
     });
   }
 
-  // Built-in interactive quiz widget
-  // Usage: <div class="llm-widget" data-widget="quiz" data-title="..." data-questions='[...]'></div>
+  // ------------------------------------------------------------------ 自测题
+  // <div class="llm-widget" data-widget="quiz" data-title="..." data-questions='[{"q","options","answer","explain"}]'></div>
+  // 选项按题目文本做确定性打乱：同一道题每次显示的顺序相同，但正确答案不会总在同一个位置。
+  function hash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function shuffledOrder(n, seed) {
+    const order = Array.from({ length: n }, (_, i) => i);
+    let s = seed || 1;
+    for (let i = n - 1; i > 0; i--) {
+      s = (Math.imul(s, 1103515245) + 12345) >>> 0;
+      const j = s % (i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    return order;
+  }
+
   register('quiz', function (container) {
     let questions = [];
     try {
-      const raw = container.getAttribute('data-questions') || '[]';
-      questions = JSON.parse(raw);
+      questions = JSON.parse(container.getAttribute('data-questions') || '[]');
     } catch (e) {
-      container.innerHTML = '<div class="lw-error">自测题数据解析失败</div>';
+      container.innerHTML = '<div class="lw-error">自测题数据格式有误（data-questions 不是合法 JSON）。</div>';
       return;
     }
-    const title = container.getAttribute('data-title') || '闯关自测：检验你的直觉';
-    const state = { answers: {} };
+    const title = container.getAttribute('data-title') || '自测';
+    const orders = questions.map((q) => shuffledOrder(q.options.length, hash(q.q)));
+    const picked = {};
 
     function render() {
-      const total = questions.length;
-      const correctCount = questions.filter((q, idx) => state.answers[idx] === q.answer).length;
-
+      const correct = questions.filter((q, i) => picked[i] === q.answer).length;
+      const answered = Object.keys(picked).length;
       container.innerHTML = `
         <div class="lw-card lw-quiz-card">
           <div class="lw-header">
-            <div class="lw-title-group">
-              <span class="lw-badge">Interactive Check</span>
-              <h4 class="lw-title">${escapeHtml(title)}</h4>
-            </div>
-            <div class="lw-quiz-score">
-              已答对 <strong>${correctCount}</strong> / ${total} 题
-            </div>
+            <h4 class="lw-title">${escapeHtml(title)}</h4>
+            <div class="lw-quiz-score">${answered ? `答对 <strong>${correct}</strong> / ${questions.length}` : `共 ${questions.length} 题`}</div>
           </div>
           <div class="lw-quiz-list">
-            ${questions
-              .map((q, qIdx) => {
-                const picked = state.answers[qIdx];
-                const answered = picked !== undefined;
-                const isRight = picked === q.answer;
-                return `
-                  <div class="lw-quiz-item ${answered ? (isRight ? 'is-correct' : 'is-wrong') : ''}">
-                    <div class="lw-quiz-q"><strong>Q${qIdx + 1}.</strong> ${q.q}</div>
-                    <div class="lw-quiz-opts">
-                      ${q.options
-                        .map((opt, oIdx) => {
-                          let cls = 'lw-quiz-opt';
-                          if (answered) {
-                            if (oIdx === q.answer) cls += ' opt-correct';
-                            else if (oIdx === picked) cls += ' opt-wrong';
-                          }
-                          return `<button type="button" class="${cls}" data-q="${qIdx}" data-o="${oIdx}">
-                            <span class="opt-letter">${String.fromCharCode(65 + oIdx)}</span>
-                            <span class="opt-text">${opt}</span>
-                          </button>`;
-                        })
-                        .join('')}
-                    </div>
-                    ${
-                      answered
-                        ? `<div class="lw-quiz-explain ${isRight ? 'exp-ok' : 'exp-err'}">
-                            <strong>${isRight ? '回答正确！' : '再想一想：'}</strong> ${q.explain}
-                          </div>`
-                        : ''
-                    }
+            ${questions.map((q, qi) => {
+              const has = picked[qi] !== undefined;
+              const right = picked[qi] === q.answer;
+              return `
+                <div class="lw-quiz-item">
+                  <div class="lw-quiz-q"><strong>${qi + 1}.</strong>${q.q}</div>
+                  <div class="lw-quiz-opts" role="group">
+                    ${orders[qi].map((oi, pos) => {
+                      let cls = 'lw-quiz-opt';
+                      if (has) {
+                        if (oi === q.answer) cls += ' opt-correct';
+                        else if (oi === picked[qi]) cls += ' opt-wrong';
+                        else cls += ' opt-dim';
+                      }
+                      return `<button type="button" class="${cls}" data-q="${qi}" data-o="${oi}" ${has ? 'disabled' : ''}>
+                        <span class="opt-letter">${String.fromCharCode(65 + pos)}</span><span class="opt-text">${q.options[oi]}</span>
+                      </button>`;
+                    }).join('')}
                   </div>
-                `;
-              })
-              .join('')}
+                  ${has ? `
+                    <div class="lw-quiz-explain ${right ? 'exp-ok' : 'exp-err'}">
+                      <strong>${right ? '正确。' : '不对。'}</strong>${q.explain}
+                    </div>
+                    ${right ? '' : `<button type="button" class="lw-quiz-retry" data-retry="${qi}">重新作答</button>`}` : ''}
+                </div>`;
+            }).join('')}
           </div>
-        </div>
-      `;
+        </div>`;
 
       container.querySelectorAll('.lw-quiz-opt').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const qIdx = Number(btn.getAttribute('data-q'));
-          const oIdx = Number(btn.getAttribute('data-o'));
-          state.answers[qIdx] = oIdx;
+          picked[Number(btn.dataset.q)] = Number(btn.dataset.o);
+          render();
+        });
+      });
+      container.querySelectorAll('[data-retry]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          delete picked[Number(btn.dataset.retry)];
           render();
         });
       });
@@ -127,10 +198,5 @@
     render();
   });
 
-  window.LLMWidgets = {
-    register,
-    mountAll,
-    formatNum,
-    escapeHtml,
-  };
+  window.LLMWidgets = { register, mountAll, formatNum, escapeHtml, color, renderMath };
 })();

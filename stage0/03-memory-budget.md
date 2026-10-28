@@ -9,10 +9,10 @@
 
 ---
 
-## 1. 为什么 14 GB 的 7B 模型放在 24 GB 显卡上，并发一高还是会 OOM？
+## 1. 14 GB 的模型放进 24 GB 显卡，为什么并发一高就 OOM
 
 很多刚接触部署的同学都踩过这样一个坑：
-你下载了 `Llama-2-7B`，看了一眼硬盘上的权重文件，一共只有 **13.5 GB**。你心想：“我手里有一张 24 GB 显存的 RTX 4090 / A10，装下 13.5 GB 权重后还足足富余 10 GB，跑个 16 人并发聊天肯定绰绰有余吧！”
+你下载了 `Llama-2-7B`，看了一眼硬盘上的权重文件，一共只有 **13.5 GB**。你心想：“我手里有一张 24 GB 显存的 RTX 4090 / A10，装下 13.5 GB 权重后还足足富余 10 GB，跑个 16 人并发聊天肯定绰绰有余吧。”
 
 结果服务刚跑起来，当 16 个用户各自发来一篇 3000 词的长对话时，程序直接崩溃：`torch.cuda.OutOfMemoryError: CUDA out of memory`。
 
@@ -22,7 +22,7 @@
 
 ---
 
-## 2. 核心心智模型：GPU 显存里住着哪三户人家？
+## 2. 显存的三部分：权重、激活、KV Cache
 
 首先，为什么我们必须把模型放在昂贵的 GPU 显存（HBM/GDDR）里，而不能放在便宜的电脑内存（CPU DRAM）甚至固态硬盘（SSD）里按需读取？
 
@@ -45,29 +45,29 @@ flowchart LR
   subgraph VRAM["一张 80 GB GPU 的显存账本（以 Qwen3-8B BF16 为例）"]
     direction LR
     W["① 模型权重 M_weights<br/>16.4 GB（一经加载，固定不变）"]
-    KV["② KV Cache 池 M_KV<br/>53.6 GB（随并发数 × 序列长度动态涨落！）"]
+    KV["② KV Cache 池 M_KV<br/>53.6 GB（随并发数 × 序列长度动态涨落。）"]
     O["③ 激活与系统开销 M_other<br/>~2.0 GB"]
     U["安全水位预留 (10%)<br/>8.0 GB"]
   end
 ```
 
 1. **① 静态权重（$M_{\text{weights}}$）**：就像书店里摆好的字典，模型加载完后大小就死死固定住了，不会随用户多少而变化。
-2. **② 动态 KV Cache（$M_{\text{KV}}$）**：模型在逐字回答每个用户时，为了不重复计算前面已经读过的词，必须把每个词在每一层的中间特征向量（Key 和 Value）记在“草稿纸”上。**并发用户越多、聊得越长，草稿纸占用的空间就线性暴涨**——刚才让 24 GB 显卡崩溃的元凶就是它！
+2. **② 动态 KV Cache（$M_{\text{KV}}$）**：模型在逐字回答每个用户时，为了不重复计算前面已经读过的词，必须把每个词在每一层的中间特征向量（Key 和 Value）记在“草稿纸”上。**并发用户越多、聊得越长，草稿纸占用的空间就线性暴涨**——刚才让 24 GB 显卡崩溃的元凶就是它。
 3. **③ 激活与系统开销（$M_{\text{other}}$）**：前向计算时的临时中间变量、CUDA Graph 录制图、多卡通信缓冲区等，通常占 **1.5 ~ 3 GB**。
 
 ---
 
-## 3. 交互式沙盒：亲手拨动显存账本与并发上限
+## 3. 组件：显存账本与并发上限
 
 在进入数学推导之前，请先用下面的交互式计算器做两个小实验：
-- **实验 A**：点击顶部的 **`Llama-2-7B (MHA)`** 预设，把显卡选为 **`24 GB (RTX 4090 / A10)`**，看看能同时服务几个 4096 长度的请求？（答案：只有约 **1.5 个**！一旦来 16 个请求必然 OOM。）
-- **实验 B**：保持 `24 GB` 显卡不变，点击切换到 **`Qwen3-8B (GQA)`**，再把权重精度从 `BF16` 改为 `INT4`——观察绿色的 KV Cache 池和最大并发数发生了什么戏剧性的变化！
+- **实验 A**：点击顶部的 **`Llama-2-7B (MHA)`** 预设，把显卡选为 **`24 GB (RTX 4090 / A10)`**，看看能同时服务几个 4096 长度的请求？（答案：只有约 **1.5 个**。一旦来 16 个请求必然 OOM。）
+- **实验 B**：保持 `24 GB` 显卡不变，点击切换到 **`Qwen3-8B (GQA)`**，再把权重精度从 `BF16` 改为 `INT4`——观察绿色的 KV Cache 池和最大并发数发生了什么戏剧性的变化。
 
 <div class="llm-widget" data-widget="kv-memory-calculator"></div>
 
 ---
 
-## 4. 从零逐步推导：不背公式，自己把账算出来
+## 4. 推导：权重与 KV Cache 的显存
 
 很多教程一上来就扔给你一串字母公式，我们换一种方式——打开 `Qwen/Qwen3-8B` 的配置文件 `config.json`，带着真实数字一步一步把公式自己写出来：
 
@@ -83,7 +83,7 @@ flowchart LR
 }
 ```
 
-### 第一步：算静态权重显存 $M_{\text{weights}}$
+### 第一步：算静态权重显存
 
 模型参数量 $P$ 就是网络里所有权重浮点数的总个数。每个参数占多少字节（$b_w$），完全取决于你用什么精度存储它：
 
@@ -117,23 +117,23 @@ $$
    - 如果没有写 `head_dim`，它就等于 `hidden_size / num_attention_heads`（例如 $4096 / 32 = 128$）。
    - 既有 $k$ 又有 $v$，所以 **1 个头** 需要存 $2 \times d_h = 2 \times 128 = 256$ 个数字。
 
-2. **1 层 Transformer 里有多少个 KV 头（$n_{kv}$）？—— 这里藏着 MHA 与 GQA 的关键区别！**
-   初学者最容易犯的错误，就是直接拿 `num_attention_heads`（32）去乘！让我们花 1 分钟看懂 **MHA（多头注意力）** 和 **GQA（分组查询注意力）** 的区别：
+2. **1 层 Transformer 里有多少个 KV 头（$n_{kv}$）？—— 这里藏着 MHA 与 GQA 的关键区别。**
+   初学者最容易犯的错误，就是直接拿 `num_attention_heads`（32）去乘。让我们花 1 分钟看懂 **MHA（多头注意力）** 和 **GQA（分组查询注意力）** 的区别：
 
    ```mermaid
    flowchart TB
      subgraph MHA["早期模型（如 Llama-2-7B）：MHA 多头注意力"]
        direction TB
-       Q1["32 个 Query 头 (n_q = 32)"] --- K1["一对一配有 32 个 Key/Value 头 (n_kv = 32)<br/>每个头都要单独存一份 KV！"]
+       Q1["32 个 Query 头 (n_q = 32)"] --- K1["一对一配有 32 个 Key/Value 头 (n_kv = 32)<br/>每个头都要单独存一份 KV。"]
      end
      subgraph GQA["现代模型（如 Llama-3 / Qwen3-8B）：GQA 分组查询注意力"]
        direction TB
-       Q2["32 个 Query 头 (n_q = 32)<br/>每 4 个 Q 头分成一组"] ===>|"4 个 Q 头共享 1 组 KV"| K2["只有 8 个 Key/Value 头 (n_kv = 8)<br/>KV Cache 体积直接缩小为 1/4！"]
+       Q2["32 个 Query 头 (n_q = 32)<br/>每 4 个 Q 头分成一组"] ===>|"4 个 Q 头共享 1 组 KV"| K2["只有 8 个 Key/Value 头 (n_kv = 8)<br/>KV Cache 体积直接缩小为 1/4。"]
      end
    ```
 
    - 在早期的 **MHA** 模型（如 Llama-2-7B）中，32 个 Query 头配 32 个 KV 头（$n_{kv} = 32$）。
-   - 后来人们发现，让每 4 个（甚至 8 个）Query 头**共享同一组 Key 和 Value 头**（即 **GQA**），模型回答质量几乎不降，但需要缓存的 KV 头数直接从 32 降到了 **8**（`num_key_value_heads`: $n_{kv} = 8$）！
+   - 后来人们发现，让每 4 个（甚至 8 个）Query 头**共享同一组 Key 和 Value 头**（即 **GQA**），模型回答质量几乎不降，但需要缓存的 KV 头数直接从 32 降到了 **8**（`num_key_value_heads`: $n_{kv} = 8$）。
    - 所以在 Qwen3-8B 的 **1 层** 里，1 个 Token 需要存的数字个数是：$2 \times n_{kv} \times d_h = 2 \times 8 \times 128 = 2,048$ 个数字。
 
 3. **整个模型一共有多少层（$L$）？每个数字占多少字节（$b_{kv}$）？**
@@ -154,8 +154,8 @@ $$
 | **Qwen3-8B (GQA)** | 36 | 32 / **8** | 128 | 2 (BF16) | $2 \times 36 \times \mathbf{8} \times 128 \times 2 = 147,456\text{ B}$ | **144 KiB / token** |
 
 看到这个惊人的对比了吗？
-- **Llama-2-7B**：每 1 个 Token 就要吃掉 `0.5 MB` 显存！如果 16 个并发用户每人聊到 4096 Token，光是 KV Cache 就要 $0.5\text{ MB} \times 4096 \times 16 = \mathbf{32\text{ GB}}$，比它 13.5 GB 的权重还大两倍多！
-- **Qwen3-8B**：虽然总参数量还大一点（8.19B vs 6.74B），但因为用了 GQA（$n_{kv}=8$），每个 Token 只占 `144 KiB`，足足省了 **72%** 的 KV 显存！
+- **Llama-2-7B**：每 1 个 Token 就要吃掉 `0.5 MB` 显存。如果 16 个并发用户每人聊到 4096 Token，光是 KV Cache 就要 $0.5\text{ MB} \times 4096 \times 16 = \mathbf{32\text{ GB}}$，比它 13.5 GB 的权重还大两倍多。
+- **Qwen3-8B**：虽然总参数量还大一点（8.19B vs 6.74B），但因为用了 GQA（$n_{kv}=8$），每个 Token 只占 `144 KiB`，足足省了 **72%** 的 KV 显存。
 
 ---
 
@@ -180,14 +180,14 @@ $$
 
 ---
 
-## 5. 工程锦囊：当 KV Cache 不够用时，我们有哪些武器？
+## 5. KV Cache 不够用时的办法
 
 在后面的章节中，我们将逐一解锁扩大并发容量的六大武器，它们全都在操作上面这条公式里的某一项：
 
 | 优化武器 | 它改变了公式里的哪一项？ | 对并发容量 $T_{\max}$ 的效果 | 对应后续章节 |
 |---|---|---|---|
 | **权重量化（BF16 → INT4）** | 把 $b_w$ 从 $2$ 降到 $0.5$，$M_{\text{weights}}$ 缩小为 1/4 | 省下的十几 GB 显存全部变成 KV 预算，小显存卡救星 | 第 2 部分 (`2.1`~`2.3`) |
-| **KV Cache 量化（BF16 → FP8）** | 把 $b_{kv}$ 从 $2$ 降到 $1$，$\text{KV}_{\text{token}}$ 直接砍半 | **可缓存 Token 数 $T_{\max}$ 直接翻倍！** | `2.5 FP8 与 KV 量化` |
+| **KV Cache 量化（BF16 → FP8）** | 把 $b_{kv}$ 从 $2$ 降到 $1$，$\text{KV}_{\text{token}}$ 直接砍半 | **可缓存 Token 数 $T_{\max}$ 直接翻倍。** | `2.5 FP8 与 KV 量化` |
 | **GQA / MQA / MLA 注意力架构** | 在模型架构层大幅减小 $n_{kv}$ 或压缩维度 | 单 Token KV 缩小 4~8 倍以上 | `3.1 注意力变体` |
 | **分页管理（PagedAttention）** | 消除按最大长度 $S_{\max}$ 预留造成的 60%+ 空置浪费 | 让实际可跑的并发数从按 $S_{\max}$ 算变成按**实际平均长度**算 | `1.6 vLLM 与分页` |
 | **前缀缓存（Prefix Caching）** | 多个请求共享的 System Prompt 只存 1 份 KV | 重复前缀部分零额外显存消耗 | `1.7 前缀缓存` |
@@ -197,7 +197,7 @@ $$
 
 ---
 
-## 6. 动手实验：用 Python 脚本估算并与 vLLM 实测对账
+## 6. 实验：脚本估算与 vLLM 实测对账
 
 ### 实验 1：运行本仓库的显存估算器（纯 CPU 即可运行）
 仓库中的 [`code/stage0/estimate_memory.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage0/estimate_memory.py) 把上面的三步推导写成了通用工具，直接读取任意模型的 `config.json`：
@@ -228,51 +228,17 @@ vllm serve Qwen/Qwen3-8B --max-model-len 4096 --gpu-memory-utilization 0.9 2>&1 
   | grep -E "Model loading|KV cache size|Maximum concurrency"
 ```
 
-接着尝试加上 `--kv-cache-dtype fp8`，再次运行上面的命令，亲眼验证日志里的 `GPU KV cache size` 是否如公式预测的那样直接翻了一倍！
+接着尝试加上 `--kv-cache-dtype fp8`，再次运行上面的命令，亲眼验证日志里的 `GPU KV cache size` 是否如公式预测的那样直接翻了一倍。
 
 ---
 
-## 7. 闯关自测
+## 7. 自测
 
-<div class="llm-widget" data-widget="quiz" data-title="0.3 显存估算 · 闯关自测" data-questions='[
-  {
-    "q": "Llama-3-8B 有 32 层（L=32），32 个 Query 头（n_q=32），8 个 KV 头（n_kv=8），每个头维度 d_h=128。在 BF16（2 字节）精度下，每生成 1 个 Token 新增的 KV Cache 是多少？如果误把 Query 头数 32 代入公式会算出多少？",
-    "options": [
-      "正确值是 128 KiB；误用 Q 头数会算出 512 KiB（高估 4 倍）",
-      "正确值是 512 KiB；误用 Q 头数会算出 128 KiB",
-      "正确值是 64 KiB；误用 Q 头数也是 64 KiB",
-      "正确值是 144 KiB；误用 Q 头数会算出 288 KiB"
-    ],
-    "answer": 0,
-    "explain": "代入公式：2(K和V) × 32层 × 8个KV头 × 128维 × 2字节 = 131,072 Bytes = 128 KiB。如果误把 n_q=32 代入，就会算出 512 KiB，把 KV 显存需求高估整整 4 倍！"
-  },
-  {
-    "q": "你有一张 24 GB 的 RTX 4090 显卡，部署 BF16 精度的 Qwen3-8B（权重 16.4 GB，单 Token KV 为 144 KiB）。设激活预留开销为 2 GB，显存利用率上限 u=0.9。如果每个请求都用满 8,192 上下文长度，最多能同时容纳几个并发请求？",
-    "options": [
-      "约 25 个并发请求",
-      "约 2.6 个并发请求（几乎只够单人使用，急需权重量化或 KV 量化）",
-      "连 1 个请求都跑不起来，启动直接 OOM",
-      "约 88 个并发请求"
-    ],
-    "answer": 1,
-    "explain": "可用显存 = 24 × 0.9 = 21.6 GB；扣除权重 16.4 GB 和开销 2 GB 后，KV Cache 预算仅剩 3.2 GB。可缓存 Token 数 ≈ 3.2×10^9 / 147,456 ≈ 21,700 tokens，除以 8192 后仅能支持约 2.6 个满长并发请求。"
-  },
-  {
-    "q": "为什么 vLLM 启动时报告的可用 KV Cache 空间，往往比你用「显卡总显存 - 模型权重大小」粗略心算出来的少好几个 GB？",
-    "options": [
-      "因为 vLLM 故意隐藏了一部分显存留作商业版功能",
-      "因为硬盘上的权重解压到显存后会膨胀 50%",
-      "因为默认 gpu_memory_utilization=0.9 先预留了 10% 显存，且启动时 vLLM 会做一次假数据的 Profiling 前向传播，扣除峰值中间激活张量、CUDA Graph 捕获图以及通信缓冲区占用的数 GB 显存",
-      "因为操作系统的图形桌面占用了 10 GB 显存"
-    ],
-    "answer": 2,
-    "explain": "显存账本里除了权重和 KV Cache，还有第三项 M_other（峰值激活值、CUDA Graph 静态图池、NCCL 通信 buffer）以及 (1 - u) 的安全水位预留。vLLM 在启动阶段会通过一次试运行实测出 M_other 并先行扣除。"
-  }
-]'></div>
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "Llama-3-8B：32 层，32 个 Q 头，8 个 KV 头，&#36;d_h = 128&#36;，BF16。每个 token 的 KV Cache 是多少？", "options": ["128 KiB", "512 KiB", "64 KiB", "256 KiB"], "answer": 0, "explain": "&#36;2 \\times 32 \\times 8 \\times 128 \\times 2 = 131072&#36; 字节，即 128 KiB。系数 2 是 K 和 V 各一份。如果误把 32 个 Q 头代入，会得到 512 KiB，高估 4 倍；漏掉 K、V 的系数 2 会得到 64 KiB。"}, {"q": "一张 24 GB 的卡部署 BF16 的 Qwen3-8B（权重 16.4 GB，每 token KV 144 KiB），预留 2 GB 给激活，<code>gpu_memory_utilization = 0.9</code>。每个请求用满 8192 token 时，最多同时容纳几个请求？", "options": ["约 2 个", "约 4 个", "约 0 个，权重放不下", "约 10 个"], "answer": 0, "explain": "KV 预算为 &#36;24 \\times 0.9 - 16.4 - 2 = 3.2&#36; GB，可缓存约 &#36;3.2 \\times 10^9 / 147456 \\approx 21700&#36; 个 token，除以 8192 约为 2.6，只能放下 2 个。漏掉 0.9 的系数或激活预留中的一项，会算出约 4 个；两项都漏掉会算出约 6 个。"}, {"q": "vLLM 启动日志报告的 KV Cache 容量，为什么常常比“总显存减权重”少好几 GB？", "options": ["vLLM 会为每个请求预先按 max_model_len 分配好连续的 KV 空间", "<code>gpu_memory_utilization</code> 默认预留了 10%，启动时还会用一次试运行测出激活峰值并扣除，CUDA Graph 与通信缓冲也占显存", "权重加载时会在显存里保留一份 FP32 副本用于精度校验", "KV Cache 必须按 2 的幂次分配，多余的部分无法使用"], "answer": 1, "explain": "vLLM 的显存测算流程是：在利用率上限内，扣除权重和试运行测得的激活峰值，剩下的全部切成 KV 块。分页管理正是为了避免按 max_model_len 预分配连续空间，所以第一项恰好说反了。"}]'></div>
 
 ---
 
-## 延伸阅读与参考文献
+## 延伸阅读
 
 - 本教程附录：[常用估算公式速查表](appendix/cheatsheet.md)
 - Ainslie et al., [*GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints*](https://arxiv.org/abs/2305.13245), EMNLP 2023（GQA 分组查询注意力论文）

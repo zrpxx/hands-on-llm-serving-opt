@@ -1,6 +1,6 @@
 # 项目 1：MiniServe
 
-说明文档见站点中的「项目 1 MiniServe」页面（`stage1/boss-miniserve.md`）。
+说明文档见站点中的「项目 1 MiniServe」页面（`stage1/boss-miniserve.md`），动手时按「项目 1 分步指南」（`stage1/project1-walkthrough.md`）逐步完成。
 
 ## 目录
 
@@ -11,7 +11,9 @@
 | `baseline_hf.py` | Hugging Face 逐请求基线（步骤 1-1） |
 | `bench.py` | 压测客户端，适用于任意 OpenAI 兼容服务 |
 | `tools/make_tiny_model.py` | 生成随机初始化的微型 Qwen3，用于 CPU 上开发 |
-| `tests/` | 正确性测试：以 Hugging Face 的贪心输出为参照 |
+| `tests/test_steps.py` | 分步测试：每一步一组，`pytest tests/test_steps.py -k step03` |
+| `tests/` 其他文件 | 端到端测试：以 Hugging Face 的贪心输出为参照 |
+| `tools/trace.py` | 逐步打印调度器 / 引擎状态，用于理解和调试 |
 
 ## 常用命令
 

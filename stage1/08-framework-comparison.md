@@ -9,7 +9,7 @@
 
 ---
 
-## 1. 为什么传统模型服务框架（TorchServe / TF Serving）被淘汰了？
+## 1. 通用模型服务框架为什么不够用
 
 经过前 7 节的学习，你已经把现代大模型推理引擎的五脏六腑摸得一清二楚了。现在回头看传统的通用深度学习服务框架（如 TorchServe、TensorFlow Serving），你就明白为什么它们在大模型时代几乎无人问津：
 
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 四大主流推理框架全景对比
+## 2. 主流推理框架对比
 
 目前工业界与开源社区最核心的四个推理框架，各自占据着非常清晰的生态位：
 
@@ -46,11 +46,11 @@ flowchart TB
 | **前缀缓存机制** | 块级链式哈希（Block Hashing） | **RadixAttention（基数树）** + 缓存感知调度 | 块级 KV 复用 | 会话级 Prompt 缓存 |
 | **杀手锏特性** | 新模型 Day-0 支持、社区插件最全、V1 架构极其稳健 | 极速 JSON/EBNF 约束解码、高效多模态与 DeepSeek 深度优化 | NVIDIA 官方算子库（FP4/FP8/通信）最快落地 | GGUF 格式 2~8 bit 量化、支持 CPU+GPU 混合卸载 |
 | **支持的硬件** | NVIDIA、AMD、TPU、昇腾、CPU 等 | NVIDIA、AMD、TPU、昇腾、CPU 等 | **仅限 NVIDIA GPU** | 几乎所有硬件（Mac M系列、x86/ARM CPU、各家 GPU） |
-| **上手与排障难度** | ★☆☆（极易上手） | ★☆☆（极易上手） | ★★☆（较重，需对齐驱动与编译环境） | ★☆☆（单二进制文件即跑） |
+| **上手与排障难度** | （极易上手） | （极易上手） | （较重，需对齐驱动与编译环境） | （单二进制文件即跑） |
 
 ---
 
-## 3. 交互式沙盒：你的业务场景最适合哪个推理框架？
+## 3. 组件：按场景选框架
 
 点击下方选型器中的不同业务场景，查看推荐的推理框架、核心理由以及对应的启动命令：
 
@@ -94,7 +94,7 @@ print(llm("The capital of France is", max_tokens=64)["choices"][0]["text"])
 
 ---
 
-## 4. 企业级框架选型的“六步铁律”（按负载选，不按热度选！）
+## 4. 选型步骤
 
 不要因为网上某篇测评说“框架 X 比框架 Y 快 20%”就盲目跟风切换。大模型框架的性能对**硬件型号、模型架构（稠密 vs MoE、MHA vs GQA/MLA）、输入输出长度比、前缀重合度**极度敏感。科学的选型必须遵循以下六步：
 
@@ -103,11 +103,11 @@ print(llm("The capital of France is", max_tokens=64)["choices"][0]["text"])
 3. **对齐一切基准参数做苹果对苹果（Apples-to-Apples）对比**：统一模型权重、统一精度（BF16 或 FP8）、统一 `--max-model-len`、统一开启或关闭前缀缓存，用同一个外部压测客户端（如本仓库的 `code/project1/bench.py`）施压。
 4. **考察生产可运维性**：冷启动要多久？崩溃报错好不好查？Prometheus 监控指标全不全？
 5. **评估多硬件可移植性**：如果公司既有 NVIDIA 卡又有国产卡或 AMD 卡，优先选 vLLM / SGLang。
-6. **用 OpenAI 兼容接口做抽象隔离**：业务代码永远只调标准的 `/v1/chat/completions` 接口。这样每隔半年框架格局变化时，只需改一行 Docker 镜像配置就能无缝切换后端！
+6. **用 OpenAI 兼容接口做抽象隔离**：业务代码永远只调标准的 `/v1/chat/completions` 接口。这样每隔半年框架格局变化时，只需改一行 Docker 镜像配置就能无缝切换后端。
 
 ---
 
-## 5. 动手实验：用同一套压测脚本对 vLLM 与 SGLang 做公平对决
+## 5. 实验：用同一套脚本对比 vLLM 与 SGLang
 
 在 GPU 上分别用完全相同的参数启动 vLLM 和 SGLang，然后用 `code/project1/bench.py` 在两组典型负载下（**负载 A：短输入长输出聊天** vs **负载 B：4096 共享长前缀文档问答**）同台竞技：
 
@@ -128,47 +128,13 @@ python code/project1/bench.py --base-url http://localhost:8000 --model Qwen/Qwen
 
 ---
 
-## 6. 闯关自测
+## 6. 自测
 
-<div class="llm-widget" data-widget="quiz" data-title="1.8 推理框架对比 · 闯关自测" data-questions='[
-  {
-    "q": "某企业内部需要在没有独立 GPU 的纯 CPU 服务器（或员工的 MacBook 笔记本）上，为 10 名法务人员私有部署一个低并发的 8B 合同问答工具。最适合选择哪个推理框架？",
-    "options": [
-      "TensorRT-LLM（它只支持 NVIDIA GPU）",
-      "llama.cpp（或基于它封装的 Ollama），配合 GGUF 4-bit/8-bit 量化，纯 C/C++ 实现且针对 CPU SIMD 与 Apple Metal 做了深度优化",
-      "必须买 8 张 H100 才能跑 8B 模型",
-      "原生 PyTorch FP32 直接运行"
-    ],
-    "answer": 1,
-    "explain": "llama.cpp 专为本地、边缘与低并发场景设计，无重型 Python/CUDA 依赖，配合 GGUF 量化可在普通 CPU 服务器或 Mac 上流畅运行 8B 模型。"
-  },
-  {
-    "q": "为什么说“看到某篇博客评测框架 A 在 ShareGPT 数据集上比框架 B 快 15%，就立刻决定把公司所有线上服务换成框架 A”是错误的工程决策？",
-    "options": [
-      "因为博客里的数据一定是伪造的",
-      "因为推理性能高度依赖具体的负载特征（输入输出长度比、前缀共享率、是否开启结构化输出）、模型结构（MHA/GQA/MoE）与硬件型号；别人的短对话测试集完全不代表你自己的长文档或 Agent 业务负载",
-      "因为所有推理框架的速度在任何情况下都绝对相等",
-      "因为换框架需要重训模型权重"
-    ],
-    "answer": 1,
-    "explain": "选型的第一原则是“按自己的真实负载和 SLO 选”。必须在相同的硬件、精度、上下文长度下，用符合自身业务分布的流量实测 Goodput。"
-  },
-  {
-    "q": "为了防止业务代码被某一个特定的推理框架绑定死（Vendor/Framework Lock-in），工程上最简单有效的架构解耦做法是什么？",
-    "options": [
-      "自己从零用汇编语言写一套推理引擎",
-      "让上层业务代码与网关统一只调用标准的 OpenAI 兼容 HTTP/SSE 接口（/v1/chat/completions），将具体框架的启动参数封装在容器配置层，并维护一套与框架无关的自动化压测回归脚本",
-      "同时在每台机器上启动四个框架",
-      "不使用任何推理框架"
-    ],
-    "answer": 1,
-    "explain": "vLLM、SGLang、TensorRT-LLM、llama.cpp 均原生提供 OpenAI 兼容接口。以此作为标准契约层，底层引擎即可随时灰度替换或混部。"
-  }
-]'></div>
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "要在没有独立 GPU 的服务器或 MacBook 上，为十几个人私有部署一个低并发的 8B 模型，最合适的选择是：", "options": ["vLLM 的 CPU 后端，开启张量并行", "llama.cpp（或基于它的 Ollama），配合 GGUF 的 4~8 位量化", "SGLang，开启 RadixAttention 共享前缀", "TensorRT-LLM，先把模型编译成 CPU 引擎"], "answer": 1, "explain": "llama.cpp 针对 CPU 与 Apple Silicon 做了大量优化，GGUF 量化能把 8B 模型压到 5~9 GB，低并发下体验最好。vLLM 与 SGLang 的优势在 GPU 上的高并发调度，TensorRT-LLM 只支持 NVIDIA GPU。"}, {"q": "看到一篇评测说框架 A 在 ShareGPT 数据集上比框架 B 快 15%，为什么不应该据此直接迁移线上服务？", "options": ["ShareGPT 数据集已经过时，评测结果不再有参考价值", "性能高度依赖负载（输入输出长度、前缀共享率、结构化输出）、模型结构、硬件和并发度；应该用自己的流量和 SLO 复现对比", "框架之间的性能差距通常小于测量误差", "迁移框架需要重新训练模型"], "answer": 1, "explain": "同一组框架在不同负载下的排名经常互换。评测时还要对齐版本、量化方式和关键参数，并比较满足 SLO 的 Goodput，而不只是峰值吞吐。"}, {"q": "为了避免业务代码与某一个推理框架绑定，最简单有效的做法是：", "options": ["在业务代码中同时引入多个框架的 Python SDK，按配置切换", "业务侧只调用 OpenAI 兼容的 HTTP/SSE 接口，框架差异封装在网关之后", "把模型导出成 ONNX，所有框架都从 ONNX 加载", "固定使用一个框架的某个版本，不再升级"], "answer": 1, "explain": "主流框架都提供 OpenAI 兼容接口，换框架时只需替换后端与网关配置。直接依赖各框架的 Python 接口会把引擎细节带进业务代码。ONNX 并不被这些 LLM 服务框架普遍作为主加载格式。"}]'></div>
 
 ---
 
-## 延伸阅读与参考文献
+## 延伸阅读
 
 - Chi Wang & Peiheng Hu, *Hands-On LLM Serving and Optimization*, O'Reilly, Chapter 8 (*LLM Serving Frameworks*)
-- 下一站实战闯关：**[项目 1 · MiniServe：亲手从零实现一个迷你推理引擎](stage1/boss-miniserve.md)**！
+- 下一站实战闯关：**[项目 1 · MiniServe：亲手从零实现一个迷你推理引擎](stage1/boss-miniserve.md)**。

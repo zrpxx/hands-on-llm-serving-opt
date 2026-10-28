@@ -24,7 +24,7 @@
         arch: '单模型专用服务（Single-Model Serving）+ 多副本横向扩展',
         routing: '前缀缓存感知路由（Prefix/KV-aware Routing）+ 动态负载均衡',
         whyArch: '流量集中在一个主力模型上，独占 GPU 容器可避免多模型争抢显存，且能把剩余显存全部留给 KV Cache 支撑高并发。',
-        whyRoute: '不能用简单轮询（Round-Robin）！因为 16K 长文档请求和 50 字短闲聊耗时相差百倍；同时多轮对话包含相同历史前缀，路由到同一实例可直接省去重复 Prefill。',
+        whyRoute: '不能用简单轮询（Round-Robin）。因为 16K 长文档请求和 50 字短闲聊耗时相差百倍；同时多轮对话包含相同历史前缀，路由到同一实例可直接省去重复 Prefill。',
         diagram: ['客户端流量', 'KV/负载感知网关', 'vLLM 副本 1 (独占 GPU)', 'vLLM 副本 2 (独占 GPU)'],
       },
       {
@@ -73,8 +73,7 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Sandbox</span>
-              <h4 class="lw-title">服务形态与路由策略决策沙盒</h4>
+              <h4 class="lw-title">服务形态与路由策略决策组件</h4>
             </div>
           </div>
           <p class="lw-subtitle">点击切换下方四个典型业务场景，观察约束条件如何决定服务架构与负载均衡策略：</p>
@@ -100,14 +99,14 @@
               <div class="lw-stat-value" style="font-size:13px">${s.privacy}</div>
             </div>
           </div>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin:12px 0;">
-            <div style="font-size:12px;color:#64748b;margin-bottom:8px;font-weight:600;">推荐请求链路架构：</div>
+          <div style="background:var(--paper-2);border:1px solid var(--rule);border-radius:8px;padding:14px;margin:12px 0;">
+            <div style="font-size:12px;color:var(--ink-3);margin-bottom:8px;font-weight:600;">推荐请求链路架构：</div>
             <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
               ${s.diagram
                 .map(
                   (node, i) => `
-                  <div style="background:#10b981;color:#fff;padding:6px 12px;border-radius:6px;font-size:12.5px;font-weight:600;">${node}</div>
-                  ${i < s.diagram.length - 1 ? '<span style="color:#64748b;font-weight:700;">→</span>' : ''}
+                  <div style="background:var(--prefill-soft);color:var(--prefill-ink);border:1px solid var(--prefill);padding:5px 12px;border-radius:4px;font-size:12.5px;font-weight:600;">${node}</div>
+                  ${i < s.diagram.length - 1 ? '<span style="color:var(--ink-3);font-weight:700;">→</span>' : ''}
                 `
                 )
                 .join('')}
@@ -116,12 +115,12 @@
           <div class="lw-stats">
             <div class="lw-stat ok">
               <div class="lw-stat-label">推荐服务架构</div>
-              <div class="lw-stat-value" style="font-size:14px;color:#047857;">${s.arch}</div>
+              <div class="lw-stat-value" style="font-size:14px;color:var(--ok);">${s.arch}</div>
               <div class="lw-stat-sub" style="margin-top:6px;line-height:1.5;">${s.whyArch}</div>
             </div>
             <div class="lw-stat warn">
               <div class="lw-stat-label">推荐路由与负载均衡策略</div>
-              <div class="lw-stat-value" style="font-size:14px;color:#b45309;">${s.routing}</div>
+              <div class="lw-stat-value" style="font-size:14px;color:var(--decode-ink);">${s.routing}</div>
               <div class="lw-stat-sub" style="margin-top:6px;line-height:1.5;">${s.whyRoute}</div>
             </div>
           </div>
@@ -181,7 +180,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Sandbox</span>
               <h4 class="lw-title">GPU 规格对比器与“稀疏算力陷阱”演示</h4>
             </div>
           </div>
@@ -208,35 +206,35 @@
             <div class="lw-control">
               <label>算力口径切换</label>
               <button type="button" id="lw-sparse-toggle" class="lw-btn ${state.showSparseTrap ? 'active' : ''}">
-                ${state.showSparseTrap ? '⚠️ 当前显示：宣传册 2:4 稀疏算力（虚高 2 倍）' : '✅ 当前显示：真实稠密（Dense）算力'}
+                ${state.showSparseTrap ? '当前显示：宣传册 2:4 稀疏算力（虚高 2 倍）' : '当前显示：真实稠密（Dense）算力'}
               </button>
             </div>
           </div>
 
           ${
             state.showSparseTrap
-              ? `<div class="lw-callout" style="border-left-color:#ef4444;background:rgba(239,68,68,0.08);">
-                  <strong>⚠️ 踩坑预警：</strong> NVIDIA 宣传页常标注 <strong>With Sparsity（2:4 结构化稀疏）</strong> 算力（如 H100 BF16 标为 1979 TFLOPS）。但绝大多数开源大模型权重都是<strong>稠密（Dense）</strong>的，实际可用峰值只有一半（989 TFLOPS）！用稀疏值估算 Prefill 时间会直接算快一倍。
+              ? `<div class="lw-callout" style="border-left-color:var(--err);">
+                  <strong>踩坑预警：</strong> NVIDIA 宣传页常标注 <strong>With Sparsity（2:4 结构化稀疏）</strong> 算力（如 H100 BF16 标为 1979 TFLOPS）。但绝大多数开源大模型权重都是<strong>稠密（Dense）</strong>的，实际可用峰值只有一半（989 TFLOPS）。用稀疏值估算 Prefill 时间会直接算快一倍。
                 </div>`
               : ''
           }
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px;">
             ${[
-              { g: a, tf: tflopsA, ridge: ridgeA, color: '#10b981' },
-              { g: b, tf: tflopsB, ridge: ridgeB, color: '#3b82f6' },
+              { g: a, tf: tflopsA, ridge: ridgeA, color: W.color('prefill') },
+              { g: b, tf: tflopsB, ridge: ridgeB, color: W.color('decode') },
             ]
               .map(
                 ({ g, tf, ridge, color }) => `
-              <div style="border:1px solid #e2e8f0;border-top:3px solid ${color};border-radius:8px;padding:14px;background:#f8fafc;">
+              <div style="border:1px solid var(--rule);border-top:3px solid ${color};border-radius:8px;padding:14px;background:var(--paper-2);">
                 <div style="font-weight:700;font-size:15px;margin-bottom:4px;">${g.name}</div>
-                <div style="font-size:12px;color:#64748b;margin-bottom:10px;">架构：${g.arch} ｜ 互联：${g.interconnect}</div>
+                <div style="font-size:12px;color:var(--ink-3);margin-bottom:10px;">架构：${g.arch} ｜ 互联：${g.interconnect}</div>
                 <div style="margin-bottom:8px;">
                   <div style="display:flex;justify-content:space-between;font-size:12px;">
                     <span>显存容量（决定能不能装下 & 并发数）</span>
                     <strong>${g.vram} GB</strong>
                   </div>
-                  <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-top:3px;">
+                  <div style="height:8px;background:var(--rule);border-radius:4px;margin-top:3px;">
                     <div style="height:100%;width:${Math.min(100, (g.vram / 141) * 100)}%;background:${color};border-radius:4px;"></div>
                   </div>
                 </div>
@@ -245,7 +243,7 @@
                     <span>显存带宽（决定 Decode 吐字速度上限）</span>
                     <strong>${g.bw} TB/s</strong>
                   </div>
-                  <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-top:3px;">
+                  <div style="height:8px;background:var(--rule);border-radius:4px;margin-top:3px;">
                     <div style="height:100%;width:${Math.min(100, (g.bw / 4.8) * 100)}%;background:${color};border-radius:4px;"></div>
                   </div>
                 </div>
@@ -254,11 +252,11 @@
                     <span>${state.precision.toUpperCase()} 算力（决定 Prefill 速度上限）</span>
                     <strong>${state.precision === 'fp8' && g.fp8Dense === 0 ? '不支持原生 FP8 计算 (回退 BF16: ' + tf + ')' : tf + ' TFLOPS'}</strong>
                   </div>
-                  <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-top:3px;">
+                  <div style="height:8px;background:var(--rule);border-radius:4px;margin-top:3px;">
                     <div style="height:100%;width:${Math.min(100, (tf / 2000) * 100)}%;background:${color};border-radius:4px;"></div>
                   </div>
                 </div>
-                <div style="font-size:12px;color:#334155;margin-top:10px;padding-top:8px;border-top:1px dashed #cbd5e1;">
+                <div style="font-size:12px;color:var(--ink-2);margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule-strong);">
                   16B 权重单流 Decode 理论最快一步：<strong>${((16.4 / (g.bw * 1000)) * 1000).toFixed(1)} ms</strong>（约 ${Math.round((g.bw * 1000) / 16.4)} tok/s）<br/>
                   BF16 算术强度拐点 $I^*$：<strong>${ridge} FLOPs/Byte</strong>
                 </div>
@@ -350,7 +348,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Calculator</span>
               <h4 class="lw-title">显存账本与并发容量计算器（模拟 vLLM 启动测算）</h4>
             </div>
           </div>
@@ -406,18 +403,18 @@
             </div>
           </div>
 
-          <div style="font-size:12.5px;font-weight:600;color:#334155;">单卡显存分配比例（总计 ${state.gpuMem} GB，utilization = ${state.util}）：</div>
+          <div style="font-size:12.5px;font-weight:600;color:var(--ink-2);">单卡显存分配比例（总计 ${state.gpuMem} GB，utilization = ${state.util}）：</div>
           <div class="lw-stack-bar">
-            <div class="lw-stack-seg" style="width:${wPct}%;background:#3b82f6;" title="模型权重">${wPct > 8 ? weightGB.toFixed(1) + 'G 权重' : ''}</div>
-            <div class="lw-stack-seg" style="width:${oPct}%;background:#f59e0b;" title="激活与框架开销">${oPct > 6 ? state.overhead.toFixed(1) + 'G 激活' : ''}</div>
-            <div class="lw-stack-seg" style="width:${kvPct}%;background:#10b981;" title="可用 KV Cache 池">${kvPct > 10 ? kvBudgetGB.toFixed(1) + 'G KV 池' : ''}</div>
-            <div class="lw-stack-seg" style="width:${uPct}%;background:#94a3b8;" title="安全预留">${uPct > 8 ? unusedGB.toFixed(1) + 'G 预留' : ''}</div>
+            <div class="lw-stack-seg" style="width:${wPct}%;background:var(--ink-2);" title="模型权重">${wPct > 8 ? weightGB.toFixed(1) + 'G 权重' : ''}</div>
+            <div class="lw-stack-seg" style="width:${oPct}%;background:var(--decode);" title="激活与框架开销">${oPct > 6 ? state.overhead.toFixed(1) + 'G 激活' : ''}</div>
+            <div class="lw-stack-seg" style="width:${kvPct}%;background:var(--prefill);" title="可用 KV Cache 池">${kvPct > 10 ? kvBudgetGB.toFixed(1) + 'G KV 池' : ''}</div>
+            <div class="lw-stack-seg" style="width:${uPct}%;background:var(--rule-strong);color:var(--ink-2);" title="安全预留">${uPct > 8 ? unusedGB.toFixed(1) + 'G 预留' : ''}</div>
           </div>
           <div class="lw-legend">
-            <span class="lw-legend-item"><i class="lw-dot" style="background:#3b82f6"></i>模型权重 (${weightGB.toFixed(1)} GB)</span>
-            <span class="lw-legend-item"><i class="lw-dot" style="background:#f59e0b"></i>激活与 CUDA Graph 开销 (${state.overhead.toFixed(1)} GB)</span>
-            <span class="lw-legend-item"><i class="lw-dot" style="background:#10b981"></i>可用 KV Cache 预算 (${kvBudgetGB.toFixed(1)} GB)</span>
-            <span class="lw-legend-item"><i class="lw-dot" style="background:#94a3b8"></i>未分配预留 (${unusedGB.toFixed(1)} GB)</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--ink-2)"></i>模型权重 (${weightGB.toFixed(1)} GB)</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--decode)"></i>激活与 CUDA Graph 开销 (${state.overhead.toFixed(1)} GB)</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--prefill)"></i>可用 KV Cache 预算 (${kvBudgetGB.toFixed(1)} GB)</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--rule-strong)"></i>未分配预留 (${unusedGB.toFixed(1)} GB)</span>
           </div>
 
           <div class="lw-stats">
@@ -566,7 +563,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Simulator</span>
               <h4 class="lw-title">Roofline 算术强度与 Prefill / Decode 落点模拟器</h4>
             </div>
           </div>
@@ -589,34 +585,34 @@
             </div>
           </div>
 
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center;">
+          <div style="background:var(--paper-2);border:1px solid var(--rule);border-radius:8px;padding:10px;text-align:center;">
             <svg viewBox="0 0 ${W_SVG} ${H_SVG}" style="width:100%;max-width:${W_SVG}px;height:auto;">
               <!-- 坐标轴 -->
-              <line x1="${PAD_L}" y1="${H_SVG - PAD_B}" x2="${W_SVG - PAD_R}" y2="${H_SVG - PAD_B}" stroke="#94a3b8" stroke-width="1.5"/>
-              <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H_SVG - PAD_B}" stroke="#94a3b8" stroke-width="1.5"/>
+              <line x1="${PAD_L}" y1="${H_SVG - PAD_B}" x2="${W_SVG - PAD_R}" y2="${H_SVG - PAD_B}" stroke="${W.color('ink-3')}" stroke-width="1.5"/>
+              <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H_SVG - PAD_B}" stroke="${W.color('ink-3')}" stroke-width="1.5"/>
 
               <!-- 拐点垂直虚线 -->
-              <line x1="${xRidge}" y1="${yPeak}" x2="${xRidge}" y2="${H_SVG - PAD_B}" stroke="#f59e0b" stroke-dasharray="4 4" stroke-width="1.5"/>
-              <text x="${xRidge}" y="${H_SVG - PAD_B + 14}" font-size="10" fill="#b45309" text-anchor="middle">拐点 I*=${Math.round(ridge)}</text>
+              <line x1="${xRidge}" y1="${yPeak}" x2="${xRidge}" y2="${H_SVG - PAD_B}" stroke="${W.color('ink-3')}" stroke-dasharray="4 4" stroke-width="1.5"/>
+              <text x="${xRidge}" y="${H_SVG - PAD_B + 14}" font-size="10" fill="var(--decode-ink)" text-anchor="middle">拐点 I*=${Math.round(ridge)}</text>
 
               <!-- Roofline 折线 -->
-              <polyline points="${xStart},${yStart} ${xRidge},${yPeak} ${xEnd},${yPeak}" fill="none" stroke="#0f172a" stroke-width="3"/>
+              <polyline points="${xStart},${yStart} ${xRidge},${yPeak} ${xEnd},${yPeak}" fill="none" stroke="var(--ink)" stroke-width="3"/>
 
               <!-- 区域标注 -->
-              <text x="${PAD_L + 14}" y="${PAD_T + 16}" font-size="11" fill="#64748b">↖ 斜线区：受显存带宽限制 (Memory-bound)</text>
-              <text x="${W_SVG - PAD_R - 10}" y="${yPeak - 8}" font-size="11" fill="#0f172a" text-anchor="end">平顶区：受峰值算力限制 (${g.peakTflops} TFLOPS)</text>
+              <text x="${PAD_L + 14}" y="${PAD_T + 16}" font-size="11" fill="var(--ink-3)">↖ 斜线区：受显存带宽限制 (Memory-bound)</text>
+              <text x="${W_SVG - PAD_R - 10}" y="${yPeak - 8}" font-size="11" fill="var(--ink)" text-anchor="end">平顶区：受峰值算力限制 (${g.peakTflops} TFLOPS)</text>
 
               <!-- Decode 落点 -->
-              <circle cx="${pxDecode}" cy="${pyDecode}" r="7" fill="#3b82f6" stroke="#fff" stroke-width="2"/>
-              <text x="${pxDecode + 10}" y="${pyDecode + 4}" font-size="11" font-weight="bold" fill="#1d4ed8">Decode (b=${b}, I=${decodeI.toFixed(1)})</text>
+              <circle cx="${pxDecode}" cy="${pyDecode}" r="7" fill="${W.color('decode')}" stroke="${W.color('paper')}" stroke-width="2"/>
+              <text x="${pxDecode + 10}" y="${pyDecode + 4}" font-size="11" font-weight="bold" fill="var(--prefill-ink)">Decode (b=${b}, I=${decodeI.toFixed(1)})</text>
 
               <!-- Prefill 落点 -->
-              <circle cx="${pxPrefill}" cy="${pyPrefill}" r="7" fill="#10b981" stroke="#fff" stroke-width="2"/>
-              <text x="${pxPrefill - 10}" y="${pyPrefill - 10}" font-size="11" font-weight="bold" fill="#047857" text-anchor="end">Prefill (s=${s}, I=${prefillI.toFixed(0)})</text>
+              <circle cx="${pxPrefill}" cy="${pyPrefill}" r="7" fill="${W.color('prefill')}" stroke="${W.color('paper')}" stroke-width="2"/>
+              <text x="${pxPrefill - 10}" y="${pyPrefill - 10}" font-size="11" font-weight="bold" fill="var(--ok)" text-anchor="end">Prefill (s=${s}, I=${prefillI.toFixed(0)})</text>
 
               <!-- 轴标题 -->
-              <text x="${(PAD_L + W_SVG - PAD_R) / 2}" y="${H_SVG - 4}" font-size="11" fill="#475569" text-anchor="middle">算术强度 I (FLOPs / Byte，对数刻度)</text>
-              <text x="14" y="${H_SVG / 2}" font-size="11" fill="#475569" text-anchor="middle" transform="rotate(-90 14 ${H_SVG / 2})">可达算力 (TFLOPS)</text>
+              <text x="${(PAD_L + W_SVG - PAD_R) / 2}" y="${H_SVG - 4}" font-size="11" fill="var(--ink-2)" text-anchor="middle">算术强度 I (FLOPs / Byte，对数刻度)</text>
+              <text x="14" y="${H_SVG / 2}" font-size="11" fill="var(--ink-2)" text-anchor="middle" transform="rotate(-90 14 ${H_SVG / 2})">可达算力 (TFLOPS)</text>
             </svg>
           </div>
 
@@ -703,7 +699,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Simulator</span>
               <h4 class="lw-title">请求时间线、吞吐饱和与 Goodput（有效吞吐）模拟器</h4>
             </div>
           </div>
@@ -722,14 +717,14 @@
             </div>
           </div>
 
-          <div style="font-size:12.5px;font-weight:600;color:#334155;margin-bottom:6px;">
+          <div style="font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px;">
             单个请求的端到端时间轴分解（E2E P50 ≈ ${e2eP50} 秒，共生成 ${state.outputLen} tokens）：
           </div>
           <div class="lw-stack-bar" style="height:32px;">
-            <div class="lw-stack-seg" style="width:${Math.min(70, Math.max(15, (ttftP50 / (ttftP50 + tpotP50 * state.outputLen)) * 100))}%;background:#f59e0b;">
+            <div class="lw-stack-seg" style="width:${Math.min(70, Math.max(15, (ttftP50 / (ttftP50 + tpotP50 * state.outputLen)) * 100))}%;background:var(--prefill);">
               TTFT (排队+Prefill): ${ttftP50} ms
             </div>
-            <div class="lw-stack-seg" style="flex:1;background:#10b981;">
+            <div class="lw-stack-seg" style="flex:1;background:var(--decode);">
               Decode 阶段 (${state.outputLen - 1} 步 × TPOT ${tpotP50} ms/tok, ITL P99 尖峰 ${itlP99} ms)
             </div>
           </div>
@@ -758,13 +753,13 @@
           </div>
 
           <div class="lw-callout">
-            <strong>💡 观察结论：</strong>
+            <strong>观察结论：</strong>
             ${
               loadRatio < 0.6
                 ? '当前 QPS 处于轻载区，TTFT 和 TPOT 都远低于 SLO 紅线，全部吞吐都是有效吞吐（Goodput = 100% QPS），还可以继续提高并发降低单 Token 成本。'
                 : passRate > 0.7
-                ? '当前处于黄金工作点（Sweet Spot）附近！GPU 批处理效率高，且绝大多数请求仍满足 SLO。'
-                : '⚠️ 警报：虽然原始输出吞吐（Raw TPS）看起来很高，但因为排队和批大小过大，TTFT/TPOT 已经击穿 SLO 红线，有效吞吐（Goodput）反而暴跌！这正是线上压测不能只看最高吞吐的原因。'
+                ? '当前处于黄金工作点（Sweet Spot）附近。GPU 批处理效率高，且绝大多数请求仍满足 SLO。'
+                : '警报：虽然原始输出吞吐（Raw TPS）看起来很高，但因为排队和批大小过大，TTFT/TPOT 已经击穿 SLO 红线，有效吞吐（Goodput）反而暴跌。这正是线上压测不能只看最高吞吐的原因。'
             }
           </div>
         </div>

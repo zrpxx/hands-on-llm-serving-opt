@@ -1,4 +1,4 @@
-# 项目 1　MiniServe：从零手写一个迷你推理引擎
+# 项目 1　MiniServe：手写一个迷你推理引擎
 
 > **前置章节**：第 0 部分（显存与 Roofline）、第 1 部分（1.1 ~ 1.8）
 > **项目代码目录**：[`code/project1`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project1)（支持在 **纯 CPU** 上完成全部代码开发与单元测试，在 **GPU** 上完成性能压测）
@@ -17,21 +17,21 @@
 
 ---
 
-## 2. 项目代码全景图与你的闯关任务
+## 2. 代码结构与任务
 
 打开 `code/project1/` 目录，文件结构非常清爽：
 
 ```text
 code/project1/
-├── starter/miniserve/        👈 【你的主战场】包含 10 处精心设计的 TODO 填空
-├── solution/miniserve/       💡 完整参考实现（卡壳超过 30 分钟时可以随时对照查阅）
-├── baseline_hf.py            🐢 Hugging Face 逐请求串行基线（用于对比提速倍数）
-├── bench.py                  🚀 通用开环/闭环压测客户端（可压测 MiniServe / vLLM / SGLang）
-├── tools/make_tiny_model.py  🧪 一键生成几 MB 的随机权重微型 Qwen3，供 CPU 秒级调试
-└── tests/                    ✅ 自动化单元测试套件（验证调度、分页、抢占与逐位正确性）
+├── starter/miniserve/        【你的主战场】包含 12 处 TODO（11 个函数 + 注意力中的一段）
+├── solution/miniserve/       完整参考实现（卡壳超过 30 分钟时可以随时对照查阅）
+├── baseline_hf.py            Hugging Face 逐请求串行基线（用于对比提速倍数）
+├── bench.py                  通用开环/闭环压测客户端（可压测 MiniServe / vLLM / SGLang）
+├── tools/make_tiny_model.py  一键生成几 MB 的随机权重微型 Qwen3，供 CPU 秒级调试
+└── tests/                    自动化单元测试套件（验证调度、分页、抢占与逐位正确性）
 ```
 
-我们已经为你写好了所有繁琐的脚手架代码（如配置文件解析、权重加载、RoPE 旋转公式、Top-K/Top-P 采样、增量反分词等）。你只需要集中火力攻克**最核心的 4 个里程碑（共 10 个小函数填空）**：
+我们已经为你写好了所有繁琐的脚手架代码（如配置文件解析、权重加载、RoPE 旋转公式、Top-K/Top-P 采样、增量反分词等）。你只需要集中火力攻克**最核心的 4 个里程碑（共 12 处 TODO）**：
 
 ```mermaid
 flowchart LR
@@ -45,7 +45,7 @@ flowchart LR
 
 ---
 
-## 3. 5 分钟环境就绪（纯 CPU 即可开干！）
+## 3. 环境准备
 
 无论你现在用的是 Mac 还是没有显卡的轻薄本，都可以立刻跑通测试环境：
 
@@ -65,136 +65,54 @@ pytest -q tests
 
 ---
 
-## 4. 交互式沙盒：攻克最难的 `_prepare_inputs` 扁平化批次拼接
+## 4. 组件：<code>_prepare_inputs</code> 如何展平批次
 
-在动手写代码前，我们先用交互沙盒把整个项目里最考验空间想象力的一个环节——**`engine.py` 中的 `_prepare_inputs()`** 彻底搞明白。
+在动手写代码前，我们先用交互组件把整个项目里最考验空间想象力的一个环节——**`engine.py` 中的 `_prepare_inputs()`** 彻底搞明白。
 
 在传统批处理里，输入张量是二维的 `[batch_size, seq_len]`，所有序列必须补齐（Padding）到相同长度。但在开启了 Continuous Batching 和 Chunked Prefill 的现代引擎里，同一批里的请求有的本步要算 **2 个 Prefill 词**，有的本步只算 **1 个 Decode 词**。
-为了不浪费哪怕 1 个 Padding 的计算，我们把所有请求本步要算的新词**首尾相接拍平成一条一维长向量 `input_ids`（形状 `[total_new_tokens]`）**送进模型！
+为了不浪费哪怕 1 个 Padding 的计算，我们把所有请求本步要算的新词**首尾相接拍平成一条一维长向量 `input_ids`（形状 `[total_new_tokens]`）**送进模型。
 
-请点击下方沙盒切换两个具体场景，观察 `input_ids`、`positions`、`slot_mapping` 和 `sample_rows` 是怎么构造出来的：
+请点击下方组件切换两个具体场景，观察 `input_ids`、`positions`、`slot_mapping` 和 `sample_rows` 是怎么构造出来的：
 
 <div class="llm-widget" data-widget="miniserve-batch-sandbox"></div>
 
 ---
 
-## 5. 四个里程碑手把手通关指南
+## 5. 里程碑
 
-### 里程碑 1-1：跑通 Hugging Face 逐请求基线（无需写代码）
-在 GPU 或 CPU 上运行 `baseline_hf.py`，用 `bench.py` 感受一下“不合批 + 无 KV Cache”有多慢：
+> [!TIP]
+> 动手时请打开 **[项目 1 分步指南](stage1/project1-walkthrough.md)**。它把四个里程碑拆成 11 步，每一步只改一两个函数，并配有只针对这一步的测试（`pytest tests/test_steps.py -k stepNN`）、手算例子和三级提示。
 
-```bash
-python baseline_hf.py --model /tmp/tiny --device cpu --port 8001
-python bench.py --base-url http://localhost:8001 --model /tmp/tiny --num-prompts 16 --input-len 64 --output-len 32 --max-concurrency 4 --vocab-size 400
-```
+| 里程碑 | 指南步骤 | 要完成的函数 | 验证 |
+|---|---|---|---|
+| 1-1 基线 | 第 0 步、第 11 步 | 无（运行 `baseline_hf.py`） | `bench.py` |
+| 1-2 / 1-3 调度与块管理 | 第 1~6 步 | `BlockAllocator.allocate / free`，`Scheduler._blocks_needed / _allocate / _admit / _schedule_running / _schedule_continuous / _preempt` | `-k step01` ~ `-k step06`，`tests/test_scheduler.py` |
+| 1-3 输入展平与分页注意力 | 第 7~9 步 | `LLMEngine._prepare_inputs`，`Attention.forward` 中的分页注意力 | `-k step07`、`-k step08`，`tests/test_correctness.py` |
+| 1-4 HTTP 服务 | 第 10 步 | `AsyncEngine._dispatch / _loop` | `-k step10`，`tests/test_server.py` |
 
----
+注意顺序：第 3 步的 `_admit` 会用到第 2 步的块分配，所以块管理要先于调度逻辑完成。
 
-### 里程碑 1-2：实现连续批处理与 Chunked Prefill（`scheduler.py`）
+几个容易写错的接口约定（以 `starter/` 中的代码为准）：
 
-打开 `starter/miniserve/scheduler.py`，先完成与调度预算相关的三个函数：
-1. **`_schedule_running(self, budget: int)`**：
-   - 遍历 `self.running` 中的每个请求 `seq`。
-   - 还差多少词没算？回顾 `1.6` 节的黄金公式：`rem = seq.num_tokens - seq.num_computed_tokens`。
-   - 如果配置开启了 `enable_chunked_prefill`，本步分配给它的词数就是 `n = min(rem, budget)`；如果没开启切块且 `rem > 1`（说明是 Prefill），则只有当 `rem <= budget` 时才分配 `n = rem`。
-2. **`_admit(self, budget: int, allow_partial: bool)`**：
-   - 当 `self.waiting` 队列不为空、`len(self.running) < max_num_seqs` 且 `budget > 0` 时，查看队头请求 `seq = self.waiting[0]`。
-   - 如果 `allow_partial=True`（允许切块），本步给它分 `n = min(rem, budget)` 个词；否则必须 `rem <= budget` 才接纳。
-   - 调用 `self._allocate(seq, seq.num_computed_tokens + n)` 为它分配物理块（里程碑 1-3 实现），若分配成功则从 `waiting` 弹出并加入 `running`。
-3. **`_schedule_continuous(self)`**：
-   - 先调用 `scheduled, budget = self._schedule_running(budget)` 喂饱老员工；
-   - 如果刚才这一步**没有发生过抢占**且 `budget > 0`，再调用 `self._admit(budget, allow_partial=self.cfg.enable_chunked_prefill)` 招新员工！
+- `BlockAllocator.allocate()` 每次只分一块、返回 `int`；没有空闲块时抛 `RuntimeError`。
+- `_blocks_needed(seq, num_new)` 与 `_allocate(seq, num_new)` 的第二个参数是**本步新增**的 token 数，不是总数。
+- `_schedule_running(budget)` 返回三元组 `(scheduled, 剩余预算, 抢占数)`。
+- 配置直接存在调度器上：`self.block_size`、`self.chunked_prefill`、`self.max_num_seqs`；状态枚举是 `SeqStatus`；抢占计数是 `self.total_preemptions`。
+- decode 组的槽位矩阵字段是 `meta.decode_slots`。
 
 ---
 
-### 里程碑 1-3：实现 PagedAttention 分页块管理、抢占与注意力计算
-
-这是最有成就感的核心部分，建议按以下 4 小步逐个击破：
-
-#### 第 1 小步：`kv_cache.py` 中的 `BlockAllocator`
-- `allocate(n)`：如果 `len(self.free_ids) < n` 返回 `None`；否则从 `self.free_ids` 左侧弹出 `n` 个块 ID 返回（`[self.free_ids.popleft() for _ in range(n)]`）。
-- `free(block_ids)`：把归还的 `block_ids` 追加回 `self.free_ids` 右侧，并清空传入的列表。
-
-#### 第 2 小步：`scheduler.py` 中的块分配与队尾抢占
-- `_blocks_needed(num_tokens)`：$n$ 个 Token 需要几个块？向上取整除法：`(num_tokens + B - 1) // B`（其中 `B = self.cfg.block_size`）。
-- `_allocate(seq, target_tokens)`：还差几个块 = ` self._blocks_needed(target_tokens) - len(seq.block_table)`。如果需要新增块，调用 `self.allocator.allocate(need)` 并 `extend` 到 `seq.block_table`。
-- `_preempt(seq)`：当 `_schedule_running` 中发现块不够时，从 `self.running.pop()` 弹出队尾请求执行抢占：① `self.allocator.free(seq.block_table)`；② **`seq.num_computed_tokens = 0`**（千万别忘清零！）；③ `seq.status = SequenceStatus.WAITING` 并 `self.waiting.appendleft(seq)` 放回等待队头；④ `self.num_preemptions += 1`。
-
-此时运行 `pytest -q tests/test_scheduler.py`，所有调度器与抢占测试就应该全绿通过了！
-
-#### 第 3 小步：`engine.py` 中的 `_prepare_inputs`
-对照上面第 4 节的交互式沙盒，遍历本步调度的每个 `(seq, n)`：
-- 本步要算的新词区间是 `start = seq.num_computed_tokens` 到 `end = start + n`。
-- 取出新词 `seq.token_ids[start:end]` 追加到 `input_ids`，位置 `range(start, end)` 追加到 `positions`。
-- 对区间里的每个位置 `p`，用公式 `seq.block_table[p // B] * B + (p % B)` 算出写入槽位追加到 `slot_mapping`。
-- **关键判断**：如果 `end == seq.num_tokens`（说明本步算完了该请求当前所有的已知词），把 `seq` 加入 `sample_seqs`，并把它在扁平张量里的最后一行索引 `row_End - 1` 加入 `sample_rows`！
-
-#### 第 4 小步：`model.py` 中的 `Attention.forward`
-- **写入新 KV**：一行代码完成分页写入：`k_cache[meta.slot_mapping] = k` 和 `v_cache[meta.slot_mapping] = v`！
-- **Prefill 组注意力**：取出完整上下文槽位 `ks = k_cache[ctx_slots]`（形状 `[ctx, n_kv, d]`），构造大小为 `[n, ctx]` 的布尔因果掩码：第 $i$ 个新词在原序列中的绝对位置是 `(ctx - n) + i`，它只能看到列号 $\le (ctx - n + i)$ 的 Key！然后调用 `F.scaled_dot_product_attention(..., attn_mask=mask, enable_gqa=True)`。
-- **Decode 组批量注意力**：所有 Decode 请求本步都只有 `1` 个 Query 词，直接利用 `meta.decode_ctx_slots` 批量索引出 `[B, max_ctx, n_kv, d]`，传入 `meta.decode_mask` 一次性批量算完！
-
-此时运行 `pytest -q tests/test_correctness.py`，验证你的引擎输出与 Hugging Face 官方贪心输出逐位完全一致！
-
----
-
-### 里程碑 1-4：打通异步流式 HTTP 服务（`server.py`）
-
-打开 `starter/miniserve/server.py`，参照我们在 `1.4 节第 4 部分` 已经详细展示过的代码，补全 `AsyncEngine._loop` 和 `_dispatch`。完成后运行全套测试：
-
-```bash
-pytest -q tests
-```
-
-看到 **全部测试通过 (100% Passed)** 的绿色提示时，恭喜你——你已经亲手造出了一台货真价实的现代大模型推理引擎！
-
----
-
-## 6. GPU 压测实验与交付报告模板
+## 6. GPU 压测与交付报告
 
 当你在 CPU 上通过全部正确性测试后，在 GPU 机器上加载 `Qwen/Qwen3-0.6B` 或 `Qwen/Qwen3-8B`，用 `bench.py` 完成以下四组对比实验（对应 `README.md` 中的完成标准）：
 
 1. **实验 A（相对基线与 vLLM 吞吐对比）**：固定输入 512、输出 128、并发 32，对比 `baseline_hf.py`、`MiniServe` 与 `vLLM` 的输出吞吐（验证 MiniServe 达到 HF 基线 5 倍以上）。
 2. **实验 B（并发扫描曲线）**：将 `--max-concurrency` 从 `1, 2, 4, 8, 16, 32, 64` 依次扫描，观察吞吐饱和点与 TPOT 的增长关系。
 3. **实验 C（调度策略与切块预算对比）**：复现 `1.5 节` 的静态批处理 vs 连续批处理 vs Chunked Prefill 对比。
-4. **实验 D（显存估算对账）**：用 `0.3 节` 的 `estimate_memory.py` 算出的 KV 块数，与 MiniServe 启动日志打印的 `allocated N KV blocks` 进行核对（验证误差 < 15%）。
+4. **实验 D（显存估算对账）**：用 `0.3 节` 的 `estimate_memory.py` 算出的 KV 块数，与 MiniServe 启动日志中的 `KV Cache：N 块 × 16 = … token` 进行核对（验证误差 < 15%）。
 
 ---
 
-## 7. 闯关自测
+## 7. 自测
 
-<div class="llm-widget" data-widget="quiz" data-title="项目 1 MiniServe · 综合闯关自测" data-questions='[
-  {
-    "q": "在实现 MiniServe 的 Chunked Prefill 注意力计算时，假设某个请求共有 10 个 Prompt 词，第 1 步已经算了前 4 个词（位置 0,1,2,3），第 2 步正在算接下来的 3 个词（n=3，此时已入库的总上下文长度 ctx=7）。请问在第 2 步构造形状为 [3, 7] 的因果掩码时，本步第 0 行（对应原序列位置 4 的词）允许看到前几列的 Key？",
-    "options": [
-      "只能看到第 0 列（只看第 1 个词）",
-      "允许看到第 0, 1, 2, 3, 4 共 5 列（即列索引 j <= (ctx - n) + i = (7 - 3) + 0 = 4）！如果直接用 torch.tril(ones(3, 7)) 而不加偏移量 (ctx - n)，就会把前 4 个历史词全部错误屏蔽掉！",
-      "允许看到全部 7 列（包括未来的词 5 和词 6）",
-      "不需要任何掩码"
-    ],
-    "answer": 1,
-    "explain": "这是实现 Chunked Prefill 最容易踩的 Bug！在第 2 块及以后的 Prefill 步中，新 Token 的起始绝对位置不是 0，而是 ctx - n。因此第 i 个新 Token 的绝对位置是 (ctx - n) + i，掩码条件必须是 col_idx <= (ctx - n) + row_idx。"
-  },
-  {
-    "q": "在 _preempt(seq) 抢占一个正在运行的请求时，除了调用 allocator.free(seq.block_table) 释放它的全部物理 KV 块并把它放回 waiting 队列头部外，为什么还必须把 seq.num_computed_tokens 重置为 0？",
-    "options": [
-      "为了清空它已经生成出来的文本",
-      "因为它的物理 KV 块已经被回收并分给别人覆盖了！如果不把 num_computed_tokens 清零，下次它恢复运行时，调度器会误以为前面的词还在显存里，只算最后 1 个词并去空的 block_table 寻址，当场引发越界崩溃或算出乱码",
-      "为了把它的 seq_id 改成 0",
-      "其实不需要重置为 0"
-    ],
-    "answer": 1,
-    "explain": "重算式抢占（Recomputation Preemption）丢弃了显存中的 KV 状态，但保留了 seq.token_ids（Prompt + 已生成词）。将 num_computed_tokens 归零后，恢复调度时 num_tokens - 0 就会自动把整条序列重新做一次 Prefill 恢复 KV 缓存。"
-  },
-  {
-    "q": "为什么在 0.6B 这类极小模型上，用纯 Python 调度的 MiniServe 与生产级 vLLM 的单步耗时差距比较明显，而换成 8B 模型后两者的相对差距会明显缩小？",
-    "options": [
-      "因为 MiniServe 不支持 0.6B 模型",
-      "因为 0.6B 模型的单步 GPU 矩阵乘只需约 1~2 ms，此时 Python 线程准备张量、逐层发射几百个小 CUDA Kernel 的 CPU 开销占比很大（vLLM 靠 CUDA Graph 和持久化 Batch 消除了这部分开销）；而换成 8B 模型后，GPU 硬件计算与访存耗时上升为主导，Python 调度开销占比就被稀释了",
-      "因为 8B 模型的层数比 0.6B 少",
-      "因为 vLLM 在 8B 模型上会自动关闭 KV Cache"
-    ],
-    "answer": 1,
-    "explain": "这正是 1.6 节介绍 vLLM V1 工程设计（CUDA Graph 录制、Persistent Batch、多进程解耦）的意义所在：当模型很小或硬件极快时，CPU 发射 Kernel 的开销会浮出水面成为瓶颈。"
-  }
-]'></div>
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "MiniServe 的 chunked prefill：某请求有 10 个 prompt token，第一步算了位置 0~3，第二步算位置 4~6（本步 n = 3，算完后上下文长度 ctx = 7）。构造形状为 [3, 7] 的掩码时，第 0 行可以看到哪些列？", "options": ["只有第 0 列", "第 0~4 列，即满足 &#36;j \\le (ctx - n) + i&#36; 的列", "全部 7 列", "第 0~3 列，即只看历史，不看自己"], "answer": 1, "explain": "本步第 &#36;i&#36; 行的绝对位置是 &#36;(ctx - n) + i&#36;，它能看到自己和之前的所有位置。直接用 <code>torch.tril(ones(3, 7))</code> 不加偏移，会把前 4 个历史 token 误屏蔽，这是实现 chunked prefill 时最常见的错误。"}, {"q": "<code>_preempt(seq)</code> 释放了序列的全部块之后，为什么还要把 <code>num_computed_tokens</code> 置为 0？", "options": ["为了让统计中的生成 token 数归零", "块已经回到空闲列表并可能被其他序列覆盖；不清零的话，重新调度时会以为 KV 还在，直接 decode，读到别人的数据", "<code>num_computed_tokens</code> 必须与 block_table 的长度相等，否则会抛出异常", "清零后序列会被放到 WAITING 队列尾部，避免饥饿"], "answer": 1, "explain": "重算式抢占的含义是丢掉 KV，恢复时把 prompt 和已生成的 token 一起重新 prefill。已生成的输出 token 要保留，否则会重复输出；被抢占的序列通常放回 WAITING 队首而不是队尾。"}, {"q": "在 0.6B 模型上，纯 Python 调度的 MiniServe 比 vLLM 慢得明显；换成 8B 模型后差距缩小。主要原因是：", "options": ["8B 模型使用了 GQA，MiniServe 对它做了专门优化", "0.6B 模型每步 GPU 计算只有一两毫秒，Python 准备输入、逐个启动 kernel 的开销占了大头；8B 模型每步计算更长，这些固定开销占比变小", "vLLM 在大模型上会自动关闭 CUDA Graph", "8B 模型的权重放不进 vLLM 的显存预算，vLLM 需要卸载到 CPU"], "answer": 1, "explain": "小模型的瓶颈在 CPU 侧：调度、张量拼接和 kernel 启动。vLLM 用 CUDA Graph、异步调度和融合算子压缩这部分开销。模型越大，GPU 时间占比越高，框架间的差距越接近算子效率本身的差距。"}]'></div>

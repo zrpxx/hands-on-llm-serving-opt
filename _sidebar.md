@@ -23,6 +23,7 @@
   * [1.7 Prefix Caching 与 RadixAttention](stage1/07-prefix-caching.md)
   * [1.8 推理框架对比](stage1/08-framework-comparison.md)
   * [项目 1　MiniServe](stage1/boss-miniserve.md)
+  * [项目 1 分步指南](stage1/project1-walkthrough.md)
 
 * **第 2 部分　压缩与量化**
   * [2.1 量化基础](stage2/01-quant-fundamentals.md)

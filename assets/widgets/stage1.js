@@ -24,11 +24,11 @@
     };
 
     const steps = [
-      { name: '① Token Embedding', inShape: (T) => `[${T}] (Token IDs)`, outShape: (T) => `[${T}, 4096]`, desc: '查词表矩阵 [151936, 4096]，把每个整数 ID 映射成 4096 维浮点数向量。' },
-      { name: '② QKV 线性投影', inShape: (T) => `[${T}, 4096]`, outShape: (T) => `Q:[${T}, 32, 128], K/V:[${T}, 8, 128]`, desc: 'Qwen3-8B 采用 GQA：32 个 Query 头（总维 4096），但只有 8 个 K/V 头（总维 1024），每 4 个 Q 头共享 1 组 K/V。' },
-      { name: '③ RoPE + 因果自注意力', inShape: (T) => `Q:[${T}, 32, 128], K/V:[${T}, 8, 128]`, outShape: (T) => `[${T}, 4096]`, desc: '先按位置旋转 Q、K（RoPE），再做因果掩码下的打分 softmax(QK^T / √128)V，最后经 W_O 投影回 4096 维。注意：计算量随序列长度二次方或线性增长！' },
-      { name: '④ SwiGLU 前馈网络 (MLP)', inShape: (T) => `[${T}, 4096]`, outShape: (T) => `[${T}, 4096]`, desc: '先用 Gate 和 Up 两个矩阵升维到 [T, 12288]，逐元素相乘后再经 Down 矩阵降回 [T, 4096]。占全模型近 78% 的权重参数！' },
-      { name: '⑤ LM Head (仅取最后 1 行)', inShape: (T) => `[${T}, 4096] → 切片 [1, 4096]`, outShape: () => `[1, 151936] (Logits)`, desc: '生成下一个词只依赖最后一个位置的隐藏状态！只对最后 1 行做词表投影，省去 (T-1) 行的无用计算与数 GB 显存。' },
+      { name: 'Token Embedding', inShape: (T) => `[${T}] (Token IDs)`, outShape: (T) => `[${T}, 4096]`, desc: '查词表矩阵 [151936, 4096]，把每个整数 ID 映射成 4096 维浮点数向量。' },
+      { name: 'QKV 线性投影', inShape: (T) => `[${T}, 4096]`, outShape: (T) => `Q:[${T}, 32, 128], K/V:[${T}, 8, 128]`, desc: 'Qwen3-8B 采用 GQA：32 个 Query 头（总维 4096），但只有 8 个 K/V 头（总维 1024），每 4 个 Q 头共享 1 组 K/V。' },
+      { name: 'RoPE + 因果自注意力', inShape: (T) => `Q:[${T}, 32, 128], K/V:[${T}, 8, 128]`, outShape: (T) => `[${T}, 4096]`, desc: '先按位置旋转 Q、K（RoPE），再做因果掩码下的打分 softmax(QK^T / √128)V，最后经 W_O 投影回 4096 维。注意：计算量随序列长度二次方或线性增长。' },
+      { name: 'SwiGLU 前馈网络 (MLP)', inShape: (T) => `[${T}, 4096]`, outShape: (T) => `[${T}, 4096]`, desc: '先用 Gate 和 Up 两个矩阵升维到 [T, 12288]，逐元素相乘后再经 Down 矩阵降回 [T, 4096]。占全模型近 78% 的权重参数。' },
+      { name: 'LM Head (仅取最后 1 行)', inShape: (T) => `[${T}, 4096] → 切片 [1, 4096]`, outShape: () => `[1, 151936] (Logits)`, desc: '生成下一个词只依赖最后一个位置的隐藏状态。只对最后 1 行做词表投影，省去 (T-1) 行的无用计算与数 GB 显存。' },
     ];
 
     function render() {
@@ -44,7 +44,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Inspector</span>
               <h4 class="lw-title">Qwen3-8B 张量形状追踪器与长序列 Attention 开销透视</h4>
             </div>
           </div>
@@ -68,12 +67,12 @@
             </div>
           </div>
           <div class="lw-callout">${cur.desc}</div>
-          <div style="margin-top:14px;font-size:12.5px;font-weight:600;color:#334155;">
+          <div style="margin-top:14px;font-size:12.5px;font-weight:600;color:var(--ink-2);">
             Decode 单步计算量构成（上下文 $T = ${T}$ 时，线性层固定 ${linearGflops} GFLOPs vs 注意力 ${attnGflops.toFixed(1)} GFLOPs，注意力占 ${attnPct}%）：
           </div>
           <div class="lw-stack-bar">
-            <div class="lw-stack-seg" style="width:${100 - attnPct}%;background:#3b82f6;">线性层 (MLP+QKV+O): ${linearGflops} GFLOPs</div>
-            <div class="lw-stack-seg" style="width:${attnPct}%;background:#f59e0b;">${attnPct > 12 ? 'Attention: ' + attnGflops.toFixed(1) + ' GFLOPs' : ''}</div>
+            <div class="lw-stack-seg" style="width:${100 - attnPct}%;background:var(--ink-2);">线性层 (MLP+QKV+O): ${linearGflops} GFLOPs</div>
+            <div class="lw-stack-seg" style="width:${attnPct}%;background:var(--decode);">${attnPct > 12 ? 'Attention: ' + attnGflops.toFixed(1) + ' GFLOPs' : ''}</div>
           </div>
         </div>
       `;
@@ -132,7 +131,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Lab</span>
               <h4 class="lw-title">解码采样实验室：Temperature、Top-K 与 Top-P 核采样</h4>
             </div>
           </div>
@@ -157,12 +155,12 @@
                 const finalP = c.kept ? (state.temp === 0 ? 1.0 : c.prob / keptSum) : 0;
                 return `
                   <div style="display:flex;align-items:center;gap:10px;opacity:${c.kept ? 1 : 0.4};">
-                    <div style="width:95px;font-family:monospace;font-size:12.5px;font-weight:700;">"${c.token}" <span style="color:#64748b;font-weight:400;">(${c.logit})</span></div>
-                    <div style="flex:1;height:20px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
-                      <div style="height:100%;width:${(finalP * 100).toFixed(1)}%;background:${c.kept ? '#10b981' : '#94a3b8'};transition:width 0.2s;"></div>
+                    <div style="width:95px;font-family:monospace;font-size:12.5px;font-weight:700;">"${c.token}" <span style="color:var(--ink-3);font-weight:400;">(${c.logit})</span></div>
+                    <div style="flex:1;height:20px;background:var(--rule);border-radius:4px;overflow:hidden;">
+                      <div style="height:100%;width:${(finalP * 100).toFixed(1)}%;background:${c.kept ? 'var(--prefill)' : 'var(--rule-strong)'};transition:width 0.2s;"></div>
                     </div>
                     <div style="width:130px;font-family:monospace;font-size:12px;text-align:right;">
-                      ${c.kept ? `<strong>${(finalP * 100).toFixed(1)}%</strong> (原始 ${(c.prob * 100).toFixed(1)}%)` : '<span style="color:#ef4444;">已截断淘汰</span>'}
+                      ${c.kept ? `<strong>${(finalP * 100).toFixed(1)}%</strong> (原始 ${(c.prob * 100).toFixed(1)}%)` : '<span style="color:var(--err);">已截断淘汰</span>'}
                     </div>
                   </div>
                 `;
@@ -205,7 +203,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Step-by-Step Animator</span>
               <h4 class="lw-title">KV Cache 矩阵复用步进动画：为什么只缓存 K、V 而不缓存 Q？</h4>
             </div>
             <div class="lw-btn-row" style="margin:0;">
@@ -220,28 +217,28 @@
               .join('')}
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
-            <div style="border:1px solid #fecaca;background:#fef2f2;border-radius:8px;padding:12px;">
-              <div style="font-weight:700;font-size:13px;color:#b91c1c;margin-bottom:8px;">❌ 无 KV Cache（每步把全部 ${curLen} 个词重新送入模型）</div>
+            <div style="border:1px solid var(--err-soft);background:var(--err-soft);border-radius:8px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;color:var(--err);margin-bottom:8px;">无 KV Cache（每步把全部 ${curLen} 个词重新送入模型）</div>
               ${activeTokens
                 .map(
-                  (t) => `<div style="background:#fca5a5;color:#7f1d1d;padding:5px 10px;border-radius:4px;margin-bottom:4px;font-size:12px;font-weight:600;">
-                  🔄 重新计算 Q, K, V：${t}
+                  (t) => `<div style="background:var(--err-soft);color:var(--err);padding:5px 10px;border-radius:4px;margin-bottom:4px;font-size:12px;font-weight:600;">
+                  重新计算 Q, K, V：${t}
                 </div>`
                 )
                 .join('')}
-              <div style="font-size:12px;color:#991b1b;margin-top:8px;">本步计算行数：<strong>${curLen} 行</strong> ｜ 累计已算：<strong>${noCacheFlops} 行</strong></div>
+              <div style="font-size:12px;color:var(--err);margin-top:8px;">本步计算行数：<strong>${curLen} 行</strong> ｜ 累计已算：<strong>${noCacheFlops} 行</strong></div>
             </div>
-            <div style="border:1px solid #a7f3d0;background:#ecfdf5;border-radius:8px;padding:12px;">
-              <div style="font-weight:700;font-size:13px;color:#047857;margin-bottom:8px;">✅ 开启 KV Cache（只送最新词，直接读取历史 K、V）</div>
+            <div style="border:1px solid var(--ok-soft);background:var(--ok-soft);border-radius:8px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;color:var(--ok);margin-bottom:8px;">开启 KV Cache（只送最新词，直接读取历史 K、V）</div>
               ${activeTokens
                 .map((t, idx) => {
                   const isNew = state.step === 0 || idx === curLen - 1;
-                  return `<div style="background:${isNew ? '#fde68a' : '#6ee7b7'};color:#064e3b;padding:5px 10px;border-radius:4px;margin-bottom:4px;font-size:12px;font-weight:600;">
-                    ${isNew ? '⚡️ 本步新算 Q, K, V 并写入缓存：' : '📦 从显存直接复用 K, V（Q 已丢弃）：'}${t}
+                  return `<div style="background:${isNew ? 'var(--decode-soft)' : 'var(--ok-soft)'};color:var(--ok);padding:5px 10px;border-radius:4px;margin-bottom:4px;font-size:12px;font-weight:600;">
+                    ${isNew ? '本步新算 Q, K, V 并写入缓存：' : '从显存直接复用 K, V（Q 已丢弃）：'}${t}
                   </div>`;
                 })
                 .join('')}
-              <div style="font-size:12px;color:#065f46;margin-top:8px;">本步仅算：<strong>${state.step === 0 ? 3 : 1} 行</strong> ｜ 累计仅算：<strong>${withCacheFlops} 行</strong></div>
+              <div style="font-size:12px;color:var(--ok);margin-top:8px;">本步仅算：<strong>${state.step === 0 ? 3 : 1} 行</strong> ｜ 累计仅算：<strong>${withCacheFlops} 行</strong></div>
             </div>
           </div>
         </div>
@@ -271,10 +268,10 @@
   // =========================================================================
   W.register('async-streaming-flow', function (container) {
     const stages = [
-      { title: '① 客户端发起并发 SSE 请求', detail: '用户 A 和用户 B 同时请求 /v1/completions(stream=true)。FastAPI 为每个请求创建一个专属的 asyncio.Queue，并将请求封装成 (seq, queue) 放入线程安全的 inbox 队列。', activeBox: 0 },
-      { title: '② 后台引擎线程从 inbox 取任务', detail: '独立的后台线程 AsyncEngine._loop 被唤醒，把 inbox 里的新请求全部取出并注册进 Scheduler.waiting 队列，同时记住 seq_id → asyncio.Queue 的映射。', activeBox: 1 },
-      { title: '③ 执行一步 engine.step() 合批推理', detail: 'Scheduler 将 A 和 B 组成一个 Batch，GPU 一次前向传播同时算出 A 的新词 "Hello" 和 B 的新词 "你好"。', activeBox: 2 },
-      { title: '④ 跨线程精准投递回各自的协程队列', detail: '后台线程调用 loop.call_soon_threadsafe(q.put_nowait, out)，把 "Hello" 塞进 A 的 asyncio.Queue，把 "你好" 塞进 B 的 asyncio.Queue，两边互不串台、立刻通过 SSE 推给浏览器！', activeBox: 3 },
+      { title: '客户端发起并发 SSE 请求', detail: '用户 A 和用户 B 同时请求 /v1/completions(stream=true)。FastAPI 为每个请求创建一个专属的 asyncio.Queue，并将请求封装成 (seq, queue) 放入线程安全的 inbox 队列。', activeBox: 0 },
+      { title: '后台引擎线程从 inbox 取任务', detail: '独立的后台线程 AsyncEngine._loop 被唤醒，把 inbox 里的新请求全部取出并注册进 Scheduler.waiting 队列，同时记住 seq_id → asyncio.Queue 的映射。', activeBox: 1 },
+      { title: '执行一步 engine.step() 合批推理', detail: 'Scheduler 将 A 和 B 组成一个 Batch，GPU 一次前向传播同时算出 A 的新词 "Hello" 和 B 的新词 "你好"。', activeBox: 2 },
+      { title: '跨线程精准投递回各自的协程队列', detail: '后台线程调用 loop.call_soon_threadsafe(q.put_nowait, out)，把 "Hello" 塞进 A 的 asyncio.Queue，把 "你好" 塞进 B 的 asyncio.Queue，两边互不串台、立刻通过 SSE 推给浏览器。', activeBox: 3 },
     ];
     let step = 0;
 
@@ -286,7 +283,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Walkthrough</span>
               <h4 class="lw-title">异步流式批处理状态机：Web 协程与 GPU 后台线程如何协作？</h4>
             </div>
           </div>
@@ -297,7 +293,7 @@
             ${boxes
               .map(
                 (b, idx) => `
-              <div style="padding:12px;border-radius:8px;border:2px solid ${idx === s.activeBox ? '#10b981' : '#cbd5e1'};background:${idx === s.activeBox ? 'rgba(16,185,129,0.1)' : '#f8fafc'};text-align:center;font-size:12.5px;font-weight:600;white-space:pre-line;">
+              <div style="padding:12px;border-radius:8px;border:1px solid ${idx === s.activeBox ? 'var(--prefill)' : 'var(--rule)'};background:${idx === s.activeBox ? 'var(--prefill-soft)' : 'var(--paper)'};text-align:center;font-size:12.5px;font-weight:600;white-space:pre-line;">
                 ${b}
               </div>
             `
@@ -322,88 +318,163 @@
   // 5. 1.5 Continuous Batching & Chunked Prefill Timeline Simulator
   // =========================================================================
   W.register('batching-timeline-sim', function (container) {
-    const state = { mode: 'chunked' };
-    const modes = {
-      static: {
-        name: '① 静态批处理 (Static Batching)',
-        ttft: '1690 ms',
-        itlMax: '9.2 ms',
-        util: '42% (大量空泡等待)',
-        desc: '请求 1 虽然第 3 秒就生成完了，但必须干等请求 3（第 10 秒结束）才能释放整批；期间新来的请求 4 只能在门外干等 7 秒！',
-        rows: [
-          { label: '槽位 1', segs: [{ w: 30, c: '#10b981', t: 'Req1 (3s)' }, { w: 70, c: '#fecaca', t: '❌ 空闲等待 Req3 结束 (7s)' }] },
-          { label: '槽位 2', segs: [{ w: 50, c: '#3b82f6', t: 'Req2 (5s)' }, { w: 50, c: '#fecaca', t: '❌ 空闲等待 (5s)' }] },
-          { label: '槽位 3', segs: [{ w: 100, c: '#8b5cf6', t: 'Req3 长回答 (10s)' }] },
-        ],
-      },
-      continuous: {
-        name: '② 连续批处理 · 不切块 (Continuous, No Chunking)',
-        ttft: '264 ms',
-        itlMax: '62.7 ms (⚠️ 被长 Prefill 阻塞尖峰)',
-        util: '86%',
-        desc: 'Req1 一结束，Req4 立刻无缝补进槽位 1！但因为 Req4 的 Prompt 很长，它在做完整 Prefill 的那一步，把正在 Decode 的 Req2、Req3 硬生生卡停了 62.7 ms！',
-        rows: [
-          { label: '槽位 1', segs: [{ w: 30, c: '#10b981', t: 'Req1 (3s)' }, { w: 25, c: '#f59e0b', t: '⚡️ Req4 长 Prefill' }, { w: 45, c: '#10b981', t: 'Req4 Decode' }] },
-          { label: '槽位 2', segs: [{ w: 30, c: '#3b82f6', t: 'Req2' }, { w: 25, c: '#fca5a5', t: '⏸ 被 Req4 卡顿' }, { w: 20, c: '#3b82f6', t: 'Req2 完' }, { w: 25, c: '#06b6d4', t: 'Req5' }] },
-          { label: '槽位 3', segs: [{ w: 30, c: '#8b5cf6', t: 'Req3' }, { w: 25, c: '#fca5a5', t: '⏸ 被 Req4 卡顿' }, { w: 45, c: '#8b5cf6', t: 'Req3 继续 Decode' }] },
-        ],
-      },
-      chunked: {
-        name: '③ 连续批处理 + Chunked Prefill (推荐)',
-        ttft: '150 ms',
-        itlMax: '22.7 ms (✅ 丝滑无尖峰)',
-        util: '94% (算力与带宽双丰收)',
-        desc: '将 Req4 的长 Prompt 切成 3 个小块（受 max_num_batched_tokens 控制），每一块捎带脚和 Req2、Req3 的单步 Decode 一起算，既消除了空泡，又消灭了卡顿尖峰！',
-        rows: [
-          { label: '槽位 1', segs: [{ w: 30, c: '#10b981', t: 'Req1 (3s)' }, { w: 12, c: '#f59e0b', t: 'P块1' }, { w: 12, c: '#f59e0b', t: 'P块2' }, { w: 12, c: '#f59e0b', t: 'P块3' }, { w: 34, c: '#10b981', t: 'Req4 Decode' }] },
-          { label: '槽位 2', segs: [{ w: 50, c: '#3b82f6', t: 'Req2 全程丝滑 Decode (5s)' }, { w: 50, c: '#06b6d4', t: 'Req5 立即接替 (5s)' }] },
-          { label: '槽位 3', segs: [{ w: 100, c: '#8b5cf6', t: 'Req3 全程丝滑 Decode，无长卡顿 (10s)' }] },
-        ],
-      },
+    // 用与 MiniServe 相同的规则逐步模拟 5 个请求。代价模型：每一步固定 1 个时间单位（读一遍权重），
+    // 每个 prefill token 额外 1/8 个单位（prefill 受算力限制，耗时随 token 数增长）。
+    const MAX_SEQS = 3;
+    const PREFILL_COST = 1 / 8;
+    const BASE = [
+      { id: 'R1', arrive: 0, prompt: 6, out: 4 },
+      { id: 'R2', arrive: 0, prompt: 8, out: 10 },
+      { id: 'R3', arrive: 0, prompt: 5, out: 14 },
+      { id: 'R4', arrive: 3, prompt: 32, out: 6, long: true },
+      { id: 'R5', arrive: 6, prompt: 6, out: 6 },
+    ];
+    const POLICIES = {
+      static: '静态批处理',
+      nochunk: '连续批处理，不切块',
+      chunked: '连续批处理 + 切块',
     };
+    const state = { policy: 'nochunk', budget: 12, longPrompt: 32 };
+
+    function simulate(policy) {
+      const reqs = BASE.map((r) => ({
+        ...r, prompt: r.long ? state.longPrompt : r.prompt,
+        queued: false, running: false, done: false, computed: 0, generated: 0, tokenTimes: [], segs: [],
+      }));
+      const waiting = [];
+      const running = [];
+      const total = (r) => r.prompt + r.generated;
+      let t = 0;
+      for (let guard = 0; guard < 2000 && reqs.some((r) => !r.done); guard++) {
+        reqs.forEach((r) => { if (!r.queued && r.arrive <= t + 1e-9) { r.queued = true; waiting.push(r); } });
+        if (!waiting.length && !running.length) {
+          t = Math.min(...reqs.filter((r) => !r.queued).map((r) => r.arrive));
+          continue;
+        }
+        const sched = [];
+        const admit = (budget, partial) => {
+          while (waiting.length && running.length < MAX_SEQS && budget > 0) {
+            const r = waiting[0];
+            const need = total(r) - r.computed;
+            if (!partial && need > budget) break;
+            waiting.shift(); running.push(r); r.running = true;
+            const n = Math.min(need, budget);
+            sched.push([r, n]); budget -= n;
+          }
+          return budget;
+        };
+        if (policy === 'static') {
+          if (!running.length) admit(Infinity, false);
+          else running.forEach((r) => sched.push([r, 1]));
+        } else if (policy === 'nochunk') {
+          if (waiting.length && running.length < MAX_SEQS) admit(Infinity, false);
+          else running.forEach((r) => sched.push([r, 1]));
+        } else {
+          let budget = state.budget;
+          for (const r of running) {
+            if (budget <= 0) break;
+            const n = Math.min(total(r) - r.computed, budget);
+            sched.push([r, n]); budget -= n;
+          }
+          admit(budget, true);
+        }
+        const prefillTokens = sched.reduce((acc, [r, n]) => acc + (r.computed < r.prompt ? n : 0), 0);
+        const dur = 1 + prefillTokens * PREFILL_COST;
+        const inStep = new Map(sched);
+        reqs.forEach((r) => {
+          if (!r.queued || r.done) return;
+          let kind = 'wait';
+          if (inStep.has(r)) kind = r.computed < r.prompt ? 'prefill' : 'decode';
+          else if (r.running) kind = 'stall';
+          const last = r.segs[r.segs.length - 1];
+          if (last && last.kind === kind && Math.abs(last.end - t) < 1e-9) last.end = t + dur;
+          else r.segs.push({ kind, start: t, end: t + dur });
+        });
+        t += dur;
+        sched.forEach(([r, n]) => {
+          r.computed += n;
+          if (r.computed === total(r)) {
+            r.generated += 1;
+            r.tokenTimes.push(t);
+            if (r.generated >= r.out) {
+              r.done = true; r.running = false;
+              running.splice(running.indexOf(r), 1);
+            }
+          }
+        });
+      }
+      const ttft = reqs.map((r) => r.tokenTimes[0] - r.arrive);
+      const itl = reqs.map((r) => r.tokenTimes.slice(1).reduce((m, x, i) => Math.max(m, x - r.tokenTimes[i]), 0));
+      const outTokens = reqs.reduce((a, r) => a + r.out, 0);
+      return { reqs, makespan: t, ttft, itl, throughput: outTokens / t };
+    }
 
     function render() {
-      const m = modes[state.mode];
+      const sims = Object.fromEntries(Object.keys(POLICIES).map((k) => [k, simulate(k)]));
+      const sim = sims[state.policy];
+      const scale = Math.max(...Object.values(sims).map((x) => x.makespan));
+      const pct = (v) => ((v / scale) * 100).toFixed(2) + '%';
+      const f = (v) => v.toFixed(1);
+      const meanTTFT = sim.ttft.reduce((a, b) => a + b, 0) / sim.ttft.length;
+      const maxITL = Math.max(...sim.itl);
+      const worst = sim.reqs[sim.itl.indexOf(maxITL)];
+      const r4 = sim.reqs.findIndex((r) => r.long);
+
+      let note;
+      if (state.policy === 'static') {
+        note = `R4 在第 ${BASE[3].arrive} 个时间单位到达，但要等前一批三个请求全部结束才能开始，TTFT 为 ${f(sim.ttft[r4])}。R1 早早结束后，它的位置一直空着。`;
+      } else if (state.policy === 'nochunk') {
+        note = `R4 的 ${state.longPrompt} 个 prompt token 在一步内算完，这一步耗时 ${f(1 + state.longPrompt * PREFILL_COST)} 个单位，正在 decode 的请求在这一步停顿（红色），最大 ITL 达到 ${f(maxITL)}（${worst.id}）。`;
+      } else {
+        note = `每步最多处理 ${state.budget} 个 token，R4 的 prompt 被切成 ${Math.ceil(state.longPrompt / state.budget)} 块左右，与其他请求的 decode 同步进行。最大 ITL 降到 ${f(maxITL)}，代价是 R4 的 TTFT 为 ${f(sim.ttft[r4])}。调小预算，ITL 更平稳、TTFT 更长。`;
+      }
+
       container.innerHTML = `
         <div class="lw-card">
-          <div class="lw-header">
-            <div class="lw-title-group">
-              <span class="lw-badge">Interactive Timeline</span>
-              <h4 class="lw-title">批处理演进甘特图：从静态批处理到 Chunked Prefill</h4>
+          <div class="lw-header"><h4 class="lw-title">三种批处理策略的逐步模拟</h4></div>
+          <p class="lw-subtitle">5 个请求，最多同时运行 3 个。R4 的 prompt 很长。横轴是时间：每一步固定 1 个单位，每个 prefill token 再加 1/8 个单位。</p>
+          <div class="lw-tabs">
+            ${Object.entries(POLICIES).map(([k, v]) => `<button type="button" class="lw-tab ${state.policy === k ? 'active' : ''}" data-p="${k}">${v}</button>`).join('')}
+          </div>
+          <div class="lw-controls">
+            <div class="lw-control">
+              <label>每步 token 预算（仅切块模式） <span class="lw-val">${state.budget}</span></label>
+              <input type="range" min="4" max="32" step="1" value="${state.budget}" data-k="budget" ${state.policy === 'chunked' ? '' : 'disabled'} />
+            </div>
+            <div class="lw-control">
+              <label>R4 的 prompt 长度 <span class="lw-val">${state.longPrompt}</span></label>
+              <input type="range" min="8" max="64" step="4" value="${state.longPrompt}" data-k="longPrompt" />
             </div>
           </div>
-          <div class="lw-tabs">
-            ${Object.entries(modes).map(([k, v]) => `<button type="button" class="lw-tab ${state.mode === k ? 'active' : ''}" data-m="${k}">${v.name}</button>`).join('')}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
-            ${m.rows
-              .map(
-                (r) => `
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:60px;font-size:12px;font-weight:700;color:#475569;">${r.label}</div>
-                <div class="lw-stack-bar" style="flex:1;margin:0;">
-                  ${r.segs.map((sg) => `<div class="lw-stack-seg" style="width:${sg.w}%;background:${sg.c};color:#0f172a;">${sg.t}</div>`).join('')}
+          <div class="bt-rows">
+            ${sim.reqs.map((r, i) => `
+              <div class="bt-row">
+                <div class="bt-label">${r.id}<span>${r.prompt} → ${r.out}</span></div>
+                <div class="bt-track">
+                  <i class="bt-arrive" style="left:${pct(r.arrive)}"></i>
+                  ${r.segs.map((sg) => `<i class="bt-seg is-${sg.kind}" style="left:${pct(sg.start)};width:${pct(sg.end - sg.start)}"></i>`).join('')}
                 </div>
-              </div>
-            `
-              )
-              .join('')}
+                <div class="bt-num">${f(sim.ttft[i])}<span>/</span>${f(sim.itl[i])}</div>
+              </div>`).join('')}
+            <div class="bt-row bt-head"><div></div><div class="bt-axis"><span>0</span><span>${f(scale)}</span></div><div class="bt-num">TTFT / 最大 ITL</div></div>
+          </div>
+          <div class="lw-legend">
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--prefill)"></i>prefill</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--decode)"></i>decode</span>
+            <span class="lw-legend-item"><i class="lw-dot bt-dot-wait"></i>排队</span>
+            <span class="lw-legend-item"><i class="lw-dot" style="background:var(--err-soft);outline:1px solid var(--err)"></i>已在运行，但这一步没被调度</span>
           </div>
           <div class="lw-stats">
-            <div class="lw-stat info"><div class="lw-stat-label">排队与首字 TTFT P50</div><div class="lw-stat-value">${m.ttft}</div></div>
-            <div class="lw-stat ${state.mode === 'continuous' ? 'warn' : 'ok'}"><div class="lw-stat-label">最大单步间隔 (ITL Max)</div><div class="lw-stat-value" style="font-size:14px">${m.itlMax}</div></div>
-            <div class="lw-stat ok"><div class="lw-stat-label">GPU 有效利用率</div><div class="lw-stat-value" style="font-size:14px">${m.util}</div></div>
+            <div class="lw-stat info"><div class="lw-stat-label">平均 TTFT</div><div class="lw-stat-value">${f(meanTTFT)}</div></div>
+            <div class="lw-stat ${maxITL > 2.5 ? 'warn' : 'ok'}"><div class="lw-stat-label">最大 ITL</div><div class="lw-stat-value">${f(maxITL)}</div></div>
+            <div class="lw-stat"><div class="lw-stat-label">全部完成用时</div><div class="lw-stat-value">${f(sim.makespan)}</div></div>
+            <div class="lw-stat"><div class="lw-stat-label">吞吐（token / 单位时间）</div><div class="lw-stat-value">${sim.throughput.toFixed(2)}</div></div>
           </div>
-          <div class="lw-callout">${m.desc}</div>
-        </div>
-      `;
+          <div class="lw-callout">${note}</div>
+        </div>`;
 
-      container.querySelectorAll('[data-m]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          state.mode = btn.getAttribute('data-m');
-          render();
-        });
-      });
+      container.querySelectorAll('[data-p]').forEach((btn) => btn.addEventListener('click', () => { state.policy = btn.dataset.p; render(); }));
+      container.querySelectorAll('input[data-k]').forEach((inp) => inp.addEventListener('input', () => { state[inp.dataset.k] = Number(inp.value); render(); }));
     }
     render();
   });
@@ -420,28 +491,28 @@
     const snapshots = [
       {
         label: '状态 1：Req A (6 tok) 与 Req B (5 tok) 运行中',
-        note: '每块容量 4 tokens。Req A 用了 2 个物理块（块 #1 满 4 个 + 块 #4 用 2 个，内部碎片仅 2 槽位）；Req B 用了 2 个物理块（块 #2 满 + 块 #6 用 1 个）。物理块完全不需要连续！',
+        note: '每块容量 4 tokens。Req A 用了 2 个物理块（块 #1 满 4 个 + 块 #4 用 2 个，内部碎片仅 2 槽位）；Req B 用了 2 个物理块（块 #2 满 + 块 #6 用 1 个）。物理块完全不需要连续。',
         seqs: [
-          { name: 'Req A (6 tokens)', color: '#10b981', bt: [1, 4], usedInLast: 2 },
-          { name: 'Req B (5 tokens)', color: '#3b82f6', bt: [2, 6], usedInLast: 1 },
+          { name: 'Req A (6 tokens)', color: 'var(--series-1)', bt: [1, 4], usedInLast: 2 },
+          { name: 'Req B (5 tokens)', color: 'var(--series-2)', bt: [2, 6], usedInLast: 1 },
         ],
       },
       {
         label: '状态 2：Req C (9 tok) 到达，按需分配 3 个物理块',
-        note: 'Req C 需要 ⌈9/4⌉ = 3 个块，分配器从空闲池弹出 #0、#3、#5。此时 8 个物理块已用 7 个，仅剩 #7 空闲。传统连续预留若按 max_len=16 分配，这 3 个请求早就在第 1 步 OOM 了！',
+        note: 'Req C 需要 ⌈9/4⌉ = 3 个块，分配器从空闲池弹出 #0、#3、#5。此时 8 个物理块已用 7 个，仅剩 #7 空闲。传统连续预留若按 max_len=16 分配，这 3 个请求早就在第 1 步 OOM 了。',
         seqs: [
-          { name: 'Req A (6 tokens)', color: '#10b981', bt: [1, 4], usedInLast: 2 },
-          { name: 'Req B (5 tokens)', color: '#3b82f6', bt: [2, 6], usedInLast: 1 },
-          { name: 'Req C (9 tokens)', color: '#8b5cf6', bt: [0, 3, 5], usedInLast: 1 },
+          { name: 'Req A (6 tokens)', color: 'var(--series-1)', bt: [1, 4], usedInLast: 2 },
+          { name: 'Req B (5 tokens)', color: 'var(--series-2)', bt: [2, 6], usedInLast: 1 },
+          { name: 'Req C (9 tokens)', color: 'var(--series-3)', bt: [0, 3, 5], usedInLast: 1 },
         ],
       },
       {
         label: '状态 3：继续生成导致物理块耗尽 → 触发队尾抢占 (Preempt Req C)',
-        note: '当 Req A 和 Req B 继续增长需要新块而空闲池为空时，调度器暂停队尾的 Req C，释放它的物理块 #0、#3、#5，将其 num_computed_tokens 清零放回 waiting 队列，优先保住排在前面的 Req A 和 Req B 完成生成！',
+        note: '当 Req A 和 Req B 继续增长需要新块而空闲池为空时，调度器暂停队尾的 Req C，释放它的物理块 #0、#3、#5，将其 num_computed_tokens 清零放回 waiting 队列，优先保住排在前面的 Req A 和 Req B 完成生成。',
         seqs: [
-          { name: 'Req A (9 tokens, 扩块 #7)', color: '#10b981', bt: [1, 4, 7], usedInLast: 1 },
-          { name: 'Req B (9 tokens, 扩块 #0)', color: '#3b82f6', bt: [2, 6, 0], usedInLast: 1 },
-          { name: 'Req C (⚠️ 已抢占放回 Waiting, 释放块)', color: '#94a3b8', bt: [], usedInLast: 0 },
+          { name: 'Req A (9 tokens, 扩块 #7)', color: 'var(--series-1)', bt: [1, 4, 7], usedInLast: 1 },
+          { name: 'Req B (9 tokens, 扩块 #0)', color: 'var(--series-2)', bt: [2, 6, 0], usedInLast: 1 },
+          { name: 'Req C (已抢占放回 Waiting, 释放块)', color: 'var(--ink-3)', bt: [], usedInLast: 0 },
         ],
       },
     ];
@@ -460,7 +531,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Allocator</span>
               <h4 class="lw-title">PagedAttention 物理块池（Block Pool）与重算抢占模拟器</h4>
             </div>
           </div>
@@ -485,14 +555,14 @@
             ${blockOwner
               .map(
                 (owner, bId) => `
-              <div class="lw-block" style="border-color:${owner ? owner.color : '#cbd5e1'};background:${owner ? 'rgba(16,185,129,0.04)' : '#f8fafc'};">
+              <div class="lw-block" style="border-color:${owner ? owner.color : 'var(--rule-strong)'};background:${owner ? 'var(--prefill-soft)' : 'var(--paper-2)'};">
                 <div class="lw-block-title">物理块 #${bId}</div>
                 <div class="lw-slots">
                   ${[0, 1, 2, 3]
-                    .map((slot) => `<span class="lw-slot" style="background:${owner && slot < owner.filled ? owner.color : '#e2e8f0'}"></span>`)
+                    .map((slot) => `<span class="lw-slot" style="background:${owner && slot < owner.filled ? owner.color : 'var(--rule)'}"></span>`)
                     .join('')}
                 </div>
-                <div style="font-size:10px;margin-top:4px;color:#64748b;">${owner ? `归属 Req ${owner.name}` : '空闲 (Free)'}</div>
+                <div style="font-size:10px;margin-top:4px;color:var(--ink-3);">${owner ? `归属 Req ${owner.name}` : '空闲 (Free)'}</div>
               </div>
             `
               )
@@ -521,13 +591,13 @@
         title: '场景 1：标准结构（静态 System + 静态长文档在前，动态问题在后）',
         cached: ['<sys>', '你是助手', '<doc>', '财报第一段', '财报第二段', '财报第三段', '<usr>', '去年利润多少'],
         incoming: ['<sys>', '你是助手', '<doc>', '财报第一段', '财报第二段', '财报第三段', '<usr>', '今年营收多少'],
-        desc: '前 7 个词完全相同！RadixAttention（按 Token 树匹配）命中 7/8（87.5%）；vLLM 块哈希（设每块 2 词）前 3 个完整块（6 词）全部命中，仅最后 1 块因未填满或不同需重算！',
+        desc: '前 7 个词完全相同。RadixAttention（按 Token 树匹配）命中 7/8（87.5%）；vLLM 块哈希（设每块 2 词）前 3 个完整块（6 词）全部命中，仅最后 1 块因未填满或不同需重算。',
       },
       {
-        title: '场景 2：反面教材（在 Prompt 最开头塞入动态时间戳！）',
+        title: '场景 2：反面教材（在 Prompt 最开头塞入动态时间戳。）',
         cached: ['[12:00:01]', '<sys>', '你是助手', '<doc>', '财报第一段', '财报第二段', '财报第三段', '问题A'],
         incoming: ['[12:00:05]', '<sys>', '你是助手', '<doc>', '财报第一段', '财报第二段', '财报第三段', '问题A'],
-        desc: '⚠️ 灾难发生！仅仅因为第 0 个词的时间戳变了 4 秒，由于因果注意力中后面所有词的 K/V 都依赖前面的位置与内容，从第 0 个词起链式哈希全部失效，命中率瞬間变成 0%！',
+        desc: '灾难发生。仅仅因为第 0 个词的时间戳变了 4 秒，由于因果注意力中后面所有词的 K/V 都依赖前面的位置与内容，从第 0 个词起链式哈希全部失效，命中率瞬間变成 0%。',
       },
     ];
     let idx = 0;
@@ -544,23 +614,22 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Matcher</span>
-              <h4 class="lw-title">Prefix Caching 前缀匹配沙盒：为什么动态内容必须放最后？</h4>
+              <h4 class="lw-title">Prefix Caching 前缀匹配组件：为什么动态内容必须放最后？</h4>
             </div>
           </div>
           <div class="lw-tabs">
             ${cases.map((item, i) => `<button type="button" class="lw-tab ${i === idx ? 'active' : ''}" data-c="${i}">${item.title}</button>`).join('')}
           </div>
-          <div style="font-size:12px;color:#475569;margin-bottom:6px;">已缓存的请求 1 Token 序列：</div>
+          <div style="font-size:12px;color:var(--ink-2);margin-bottom:6px;">已缓存的请求 1 Token 序列：</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
-            ${c.cached.map((t) => `<span style="padding:4px 8px;background:#e2e8f0;border-radius:4px;font-family:monospace;font-size:12px;">${W.escapeHtml(t)}</span>`).join('')}
+            ${c.cached.map((t) => `<span style="padding:4px 8px;background:var(--rule);border-radius:4px;font-family:monospace;font-size:12px;">${W.escapeHtml(t)}</span>`).join('')}
           </div>
-          <div style="font-size:12px;color:#475569;margin-bottom:6px;">新到达的请求 2 Token 序列（绿色=命中复用 KV，红色=必须重新 Prefill）：</div>
+          <div style="font-size:12px;color:var(--ink-2);margin-bottom:6px;">新到达的请求 2 Token 序列（绿色=命中复用 KV，红色=必须重新 Prefill）：</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
             ${c.incoming
               .map((t, i) => {
                 const hit = i < matchLen;
-                return `<span style="padding:4px 8px;background:${hit ? '#10b981' : '#ef4444'};color:#fff;border-radius:4px;font-family:monospace;font-size:12px;font-weight:600;">${W.escapeHtml(t)}</span>`;
+                return `<span style="padding:4px 8px;background:${hit ? 'var(--ok)' : 'var(--err)'};color:#fff;border-radius:4px;font-family:monospace;font-size:12px;font-weight:600;">${W.escapeHtml(t)}</span>`;
               })
               .join('')}
           </div>
@@ -626,7 +695,6 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Interactive Advisor</span>
               <h4 class="lw-title">推理框架选型决策器（vLLM vs SGLang vs TRT-LLM vs llama.cpp）</h4>
             </div>
           </div>
@@ -636,7 +704,7 @@
           <div class="lw-stats">
             <div class="lw-stat ok">
               <div class="lw-stat-label">首选推荐框架</div>
-              <div class="lw-stat-value" style="color:#047857;">${o.rec}</div>
+              <div class="lw-stat-value" style="color:var(--ok);">${o.rec}</div>
               <div class="lw-stat-sub" style="margin-top:6px;line-height:1.5;">${o.reason}</div>
             </div>
           </div>
@@ -664,7 +732,7 @@
     const cases = [
       {
         title: '混合步示例：Seq 1 正在做第 2 块 Chunked Prefill (算 2 词) + Seq 2 正在 Decode (算 1 词)',
-        desc: 'MiniServe 的 _prepare_inputs 把两个请求本步要算的新词拍平成一维张量（共 3 行）送入模型，并用 slot_mapping 告诉每行的新 K/V 写到物理池的哪个格子里，用 sample_rows 挑出算完当前全部词的行去采样下一个 Token！',
+        desc: 'MiniServe 的 _prepare_inputs 把两个请求本步要算的新词拍平成一维张量（共 3 行）送入模型，并用 slot_mapping 告诉每行的新 K/V 写到物理池的哪个格子里，用 sample_rows 挑出算完当前全部词的行去采样下一个 Token。',
         inputIds: '[105, 208, 991]   # 前 2 个属于 Seq 1 的 Prefill 块，最后 1 个属于 Seq 2 的 Decode 词',
         positions: '[2, 3, 5]         # Seq 1 之前已算过 2 个词(pos 0,1)，本步是 pos 2,3；Seq 2 本步是 pos 5',
         slotMapping: '[10, 11, 29]      # slot = block_table[pos // 4] * 4 + (pos % 4)',
@@ -672,11 +740,11 @@
       },
       {
         title: '未完成切块示例：Seq 1 很长（共 6 词），本步只算前 3 词（未算完 Prompt）',
-        desc: '注意！因为 Seq 1 的 Prompt 一共 6 个词，本步只算了前 3 个词（num_computed_tokens 从 0 变成 3，还没追平 num_tokens=6），所以这一步结束时 Seq 1 不能采样新词，sample_rows 里不包含 Seq 1！',
+        desc: '注意。因为 Seq 1 的 Prompt 一共 6 个词，本步只算了前 3 个词（num_computed_tokens 从 0 变成 3，还没追平 num_tokens=6），所以这一步结束时 Seq 1 不能采样新词，sample_rows 里不包含 Seq 1。',
         inputIds: '[101, 102, 103, 888] # 前 3 个属于 Seq 1 的第一块，最后 1 个属于 Seq 2 的 Decode',
         positions: '[0, 1, 2, 4]         # Seq 1 位置 0,1,2；Seq 2 位置 4',
         slotMapping: '[4, 5, 6, 16]        # 各自映射到物理块槽位',
-        sampleRows: '[3]                  # 只有第 3 行（Seq 2）完成了全部已有词，参与 LM Head 采样！',
+        sampleRows: '[3]                  # 只有第 3 行（Seq 2）完成了全部已有词，参与 LM Head 采样。',
       },
     ];
     let cIdx = 0;
@@ -687,8 +755,7 @@
         <div class="lw-card">
           <div class="lw-header">
             <div class="lw-title-group">
-              <span class="lw-badge">Code Walkthrough Sandbox</span>
-              <h4 class="lw-title">MiniServe 核心难点突破：<code>_prepare_inputs</code> 扁平化张量拼接沙盒</h4>
+              <h4 class="lw-title">MiniServe 核心难点突破：<code>_prepare_inputs</code> 扁平化张量拼接组件</h4>
             </div>
           </div>
           <div class="lw-tabs">
