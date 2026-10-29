@@ -95,7 +95,7 @@
   const PART_INFO = {
     0: { desc: '模型怎样逐个生成 token，KV Cache 为什么必要；再从 GPU 规格出发，估算显存、判断瓶颈，定义衡量服务的指标。', written: true },
     1: { desc: '把模型变成在线服务：异步流式接口、连续批处理、分页 KV Cache、前缀缓存，以及主流框架的取舍。', written: true },
-    2: { desc: '量化的原理与 GPTQ、AWQ、SmoothQuant、FP8，在精度、速度与显存之间取舍。', written: false },
+    2: { desc: '量化的原理与 GPTQ、AWQ、SmoothQuant、FP8、KV Cache 量化，低比特算子，以及怎样选择、评估方案；蒸馏与剪枝。', written: true },
     3: { desc: '注意力变体、FlashAttention、用 Triton 写算子、投机解码。', written: false },
     4: { desc: '张量 / 流水线 / 专家并行，Prefill-Decode 分离，KV 分层存储与缓存感知路由。', written: false },
     5: { desc: '书的最后两章：端到端优化流程、语义缓存、多模态、端侧与强化学习中的推理。', written: false },

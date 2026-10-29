@@ -20,7 +20,7 @@
   <!-- 所有依赖都托管在仓库内（assets/vendor），不依赖外部 CDN 与网络字体 -->
   <link rel="stylesheet" href="assets/vendor/docsify-vue.css" />
   <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
-  <link rel="stylesheet" href="assets/custom.css?v=20261028b" />
+  <link rel="stylesheet" href="assets/custom.css?v=20261029b" />
 </head>
 <body>
   <div id="app">加载中…</div>
@@ -41,6 +41,10 @@
       'stage1/06-vllm-internals': 'stage1/03-paged-attention-vllm',
       'stage1/07-prefix-caching': 'stage1/04-prefix-caching',
       'stage1/08-framework-comparison': 'stage1/05-framework-comparison',
+      'stage2/04-smoothquant': 'stage2/04-activation-quant',
+      'stage2/05-fp8-int4-kv-quant': 'stage2/05-kv-cache-quant',
+      'stage2/06-distillation-pruning': 'stage2/08-distillation-pruning',
+      'stage2/07-quant-kernels': 'stage2/06-quant-kernels',
     };
     // 旧链接跳转到新路径
     function redirectMovedRoute() {
@@ -54,12 +58,12 @@
       var p = {};
       try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
       try {
-        if (!localStorage.getItem('llmopt-progress-migrated-1')) {
+        if (!localStorage.getItem('llmopt-progress-migrated-2')) {
           var out = {};
           Object.keys(p).forEach(function (k) { out[ROUTE_MOVES[k] || k] = p[k]; });
           p = out;
           localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
-          localStorage.setItem('llmopt-progress-migrated-1', '1');
+          localStorage.setItem('llmopt-progress-migrated-2', '1');
         }
       } catch (e) {}
       return p;
@@ -229,10 +233,11 @@
     };
   </script>
 
-  <script src="assets/widgets/core.js?v=20261028b"></script>
-  <script src="assets/widgets/home.js?v=20261028b"></script>
-  <script src="assets/widgets/basics.js?v=20261028b"></script>
-  <script src="assets/widgets/serving.js?v=20261028b"></script>
+  <script src="assets/widgets/core.js?v=20261029b"></script>
+  <script src="assets/widgets/home.js?v=20261029b"></script>
+  <script src="assets/widgets/basics.js?v=20261029b"></script>
+  <script src="assets/widgets/serving.js?v=20261029b"></script>
+  <script src="assets/widgets/compression.js?v=20261029b"></script>
 
   <script src="assets/vendor/docsify.min.js"></script>
   <script src="assets/vendor/search.min.js"></script>

@@ -801,3 +801,9 @@ body.is-home .markdown-section > div:first-child:not([class]) { display: none; }
 .bt-num span { color: var(--ink-3); margin: 0 3px; }
 .bt-head .bt-num { font-family: var(--font-body); color: var(--ink-3); font-size: 0.72rem; }
 .bt-axis { display: flex; justify-content: space-between; font: 0.7rem var(--font-mono); color: var(--ink-3); }
+
+/* 组件内的表格 */
+.lw-table-wrap { overflow-x: auto; margin: 4px 0 8px; }
+.markdown-section .lw-table-wrap table.lw-table { display: table; width: 100%; max-width: none; font-size: 0.84rem; margin: 0; }
+.lw-table td, .lw-table th { white-space: nowrap; }
+.lw-table tr.lw-row-hi td { background: var(--prefill-soft); font-weight: 600; }

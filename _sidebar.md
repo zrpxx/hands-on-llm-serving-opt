@@ -25,14 +25,15 @@
   * [项目 1　MiniServe](stage1/boss-miniserve.md)
   * [项目 1 分步指南](stage1/project1-walkthrough.md)
 
-* **第 2 部分　压缩与量化**
+* **第 2 部分　量化与模型压缩**
   * [2.1 量化基础](stage2/01-quant-fundamentals.md)
   * [2.2 GPTQ](stage2/02-gptq.md)
   * [2.3 AWQ](stage2/03-awq.md)
-  * [2.4 SmoothQuant（书外）](stage2/04-smoothquant.md)
-  * [2.5 FP8、INT4 与 KV Cache 量化](stage2/05-fp8-int4-kv-quant.md)
-  * [2.6 蒸馏与剪枝](stage2/06-distillation-pruning.md)
-  * [2.7 量化 Kernel：W4A16 与 W8A8（书外）](stage2/07-quant-kernels.md)
+  * [2.4 激活量化：SmoothQuant 与 FP8](stage2/04-activation-quant.md)
+  * [2.5 KV Cache 量化](stage2/05-kv-cache-quant.md)
+  * [2.6 低比特算子](stage2/06-quant-kernels.md)
+  * [2.7 怎样选择和评估量化方案](stage2/07-choosing-quantization.md)
+  * [2.8 蒸馏与剪枝](stage2/08-distillation-pruning.md)
   * [项目 2　Quant Arena](stage2/boss-quant-arena.md)
 
 * **第 3 部分　加速算法与算子**

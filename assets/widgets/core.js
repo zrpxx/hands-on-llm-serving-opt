@@ -91,7 +91,7 @@
   function loadMissing() {
     if (retried) return;
     retried = true;
-    const files = ['basics.js', 'serving.js'];
+    const files = ['basics.js', 'serving.js', 'compression.js'];
     let left = files.length;
     files.forEach((f) => {
       if (document.querySelector(`script[src^="assets/widgets/${f}"]`)) { if (--left === 0) remountAll(); return; }
