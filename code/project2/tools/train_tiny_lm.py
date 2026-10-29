@@ -26,17 +26,21 @@ def main():
     ap.add_argument("--seq", type=int, default=128)
     ap.add_argument("--lr", type=float, default=3e-3)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--tokenizer", default=None, help="复用已有模型目录中的分词器（项目 3 训练草稿模型时使用）")
     a = ap.parse_args()
     torch.manual_seed(a.seed)
     torch.set_num_threads(os.cpu_count() or 1)
 
     text = open(os.path.join(a.data, "train.txt"), encoding="utf-8").read()
-    tok = Tokenizer(models.BPE())
-    tok.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
-    tok.decoder = decoders.ByteLevel()
-    tok.train_from_iterator(text.split("\n"), trainers.BpeTrainer(
-        vocab_size=a.vocab, special_tokens=["<|endoftext|>"], initial_alphabet=pre_tokenizers.ByteLevel.alphabet()))
-    hf_tok = PreTrainedTokenizerFast(tokenizer_object=tok, eos_token="<|endoftext|>", pad_token="<|endoftext|>")
+    if a.tokenizer:
+        hf_tok = PreTrainedTokenizerFast.from_pretrained(a.tokenizer)
+    else:
+        tok = Tokenizer(models.BPE())
+        tok.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
+        tok.decoder = decoders.ByteLevel()
+        tok.train_from_iterator(text.split("\n"), trainers.BpeTrainer(
+            vocab_size=a.vocab, special_tokens=["<|endoftext|>"], initial_alphabet=pre_tokenizers.ByteLevel.alphabet()))
+        hf_tok = PreTrainedTokenizerFast(tokenizer_object=tok, eos_token="<|endoftext|>", pad_token="<|endoftext|>")
     ids = torch.tensor(hf_tok(text)["input_ids"])
 
     cfg = Qwen3Config(vocab_size=len(hf_tok), hidden_size=a.hidden, intermediate_size=a.hidden * 3,

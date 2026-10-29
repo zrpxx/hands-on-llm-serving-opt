@@ -1,0 +1,4 @@
+torch>=2.5
+triton>=3.2
+transformers>=4.51
+pytest
