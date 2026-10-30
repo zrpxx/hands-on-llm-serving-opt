@@ -97,7 +97,7 @@
     1: { desc: '把模型变成在线服务：异步流式接口、连续批处理、分页 KV Cache、前缀缓存，以及主流框架的取舍。', written: true },
     2: { desc: '量化的原理与 GPTQ、AWQ、SmoothQuant、FP8、KV Cache 量化，低比特算子，以及怎样选择、评估方案；蒸馏与剪枝。', written: true },
     3: { desc: '注意力变体与 MLA、FlashAttention 与在线 softmax、算子融合与 Triton、投机解码的原理与调参、性能剖析。', written: true },
-    4: { desc: '张量 / 流水线 / 专家并行，Prefill-Decode 分离，KV 分层存储与缓存感知路由。', written: false },
+    4: { desc: '数据、张量、流水线与专家并行，Prefill-Decode 分离，KV 分层存储，多模型与 Multi-LoRA，缓存感知路由，企业级架构。', written: true },
     5: { desc: '书的最后两章：端到端优化流程、语义缓存、多模态、端侧与强化学习中的推理。', written: false },
     6: { desc: '对照 DeepInfer、NVFP4、Wide EP、Attention-FFN 分离等 2026 年的生产实践。', written: false },
   };
