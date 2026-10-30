@@ -95,7 +95,7 @@ vllm serve deepseek-ai/DeepSeek-V3 \
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "把 EP 从 8 张卡铺到 64 张卡，最主要的收益是什么？", "options": ["每张卡上的专家变少，留给 KV 的显存变多，全局 batch 更大，每个专家分到更多 token", "通信量减少", "不再需要负载均衡", "每个 token 选的专家变少"], "answer": 0, "explain": "每个专家平均分到 B × k / E 个 token，全局 batch B 越大，MoE 的算术强度越高。代价是通信更分散。"}, {"q": "DeepEP 的低延迟模式为什么适合 decode？", "options": ["它的带宽更高", "decode 每次通信的数据很少，瓶颈在延迟；低延迟模式直接走 RDMA、不经转发，并且不占用 SM 就能与计算重叠", "它支持更多的专家", "它会压缩 KV Cache"], "answer": 1, "explain": "prefill 的数据量大，用普通模式：先经 RDMA 发到目标机器，再经 NVLink 转发，追求带宽。"}, {"q": "EPLB 用统计过的专家热度做了放置，过了很久没有更新。会发生什么？", "options": ["没有影响，热度是固定的", "热度随请求内容漂移，均衡度逐渐下降，需要定期重新统计、重新放置", "模型的输出会出错", "冗余专家会被自动删除"], "answer": 1, "explain": "本节的模拟中，统计过期后均衡度从 0.83 降到 0.67。vLLM 每 3000 步依据前 1000 步重新放置。"}]'></div>
 
 ## 延伸阅读
 

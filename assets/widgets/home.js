@@ -99,7 +99,7 @@
     3: { desc: '注意力变体与 MLA、FlashAttention 与在线 softmax、算子融合与 Triton、投机解码的原理与调参、性能剖析。', written: true },
     4: { desc: '数据、张量、流水线与专家并行，Prefill-Decode 分离，KV 分层存储，多模型与 Multi-LoRA，缓存感知路由，企业级架构。', written: true },
     5: { desc: '书的最后几章：端到端优化流程与取舍、语义缓存、多模态、端侧、强化学习与 Agent 场景下的推理。', written: true },
-    6: { desc: '对照 DeepInfer、NVFP4、Wide EP、Attention-FFN 分离等 2026 年的生产实践。', written: false },
+    6: { desc: '以 DeepInfer 为线索：NVFP4 与 MXFP4、Wide EP 与 EPLB、Attention-FFN 分离、MTP、长上下文、批不变推理、异步调度、算子 DSL。', written: true },
   };
 
   function parseSidebar(md) {

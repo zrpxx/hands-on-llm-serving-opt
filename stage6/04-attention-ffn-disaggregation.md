@@ -84,7 +84,7 @@ DeepSeek-V3
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "decode 时，为什么 Attention 的算术强度与 batch 大小无关？", "options": ["Attention 没有矩阵乘法", "每个请求读的是自己的 KV，batch 再大也不能复用；MoE 的权重则被同一 batch 中的所有 token 共用", "Attention 总是受算力限制", "KV Cache 是 FP8 的"], "answer": 1, "explain": "GQA 的强度约等于每组 KV 对应的 Q 头数；MLA 让 128 个头共享一份压缩的 KV，强度高得多。"}, {"q": "AFD 与 PD 分离的区别是：", "options": ["AFD 按算子拆分一层中的 Attention 和 FFN；PD 分离按阶段拆分 prefill 和 decode", "两者是同一件事的不同名称", "AFD 只用于 prefill", "PD 分离需要 MoE 模型"], "answer": 0, "explain": "两者可以组合：先做 PD 分离，再在 decode 实例内部做 AFD。"}, {"q": "AFD 部署中只有一个 batch 时，两侧各有约一半的时间闲着。ping-pong 流水线怎样解决？", "options": ["增加 FFN 卡的数量", "把 batch 切成几个微批，一个微批在 FFN 卡上计算时，另一个在 Attention 卡上计算", "把通信改为同步", "减少模型层数"], "answer": 1, "explain": "前提是两侧每层的耗时接近、每个微批的计算能藏住通信。微批太多，每次计算的效率又会下降。"}]'></div>
 
 ## 延伸阅读
 

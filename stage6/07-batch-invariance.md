@@ -74,7 +74,7 @@ Thinking Machines 的做法是逐个改写涉及归约的算子，**让每个元
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "温度为 0、同一个提示词，多次请求得到不同输出。最主要的原因是：", "options": ["GPU 线程并发导致每次 kernel 的结果随机", "请求和谁在同一个 batch 里是随机的，kernel 根据 batch 大小选择不同的归约策略，浮点加法的顺序随之改变", "采样器有 bug", "KV Cache 被其他请求覆盖"], "answer": 1, "explain": "大多数 kernel 在同样的形状下是确定的，缺的是批不变性。"}, {"q": "批不变的注意力 kernel 中，split-KV 应该怎样切分？", "options": ["固定切成 4 段", "固定每段的长度，而不是固定段数", "根据 batch 大小决定段数", "不切分"], "answer": 1, "explain": "固定每段的长度，每个位置所在的段和归约顺序就与 batch 和其他请求无关。"}, {"q": "批不变推理对 RL 训练的意义是：", "options": ["让采样更快", "让推理引擎给出的对数概率与训练框架重新计算的一致，实现真正的同策略训练", "减少显存占用", "提高奖励模型的准确率"], "answer": 1, "explain": "Thinking Machines 的实验中，采样与训练之间的 KL 散度降到 0；不做修正的对照组训练崩溃。"}]'></div>
 
 ## 延伸阅读
 

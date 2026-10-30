@@ -87,7 +87,7 @@ vLLM 在 GB200 上部署 DeepSeek-R1 时的做法很有代表性：MoE 专家的
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "MXFP4 与 NVFP4 的主要区别是：", "options": ["元素格式不同，前者是 INT4", "MXFP4 每 32 个元素一个只能是 2 的幂的 E8M0 缩放；NVFP4 每 16 个一个 E4M3 缩放，另有张量级的 FP32 缩放", "NVFP4 不需要缩放因子", "MXFP4 只用于权重，NVFP4 只用于激活"], "answer": 1, "explain": "两者的元素都是 E2M1。NVFP4 的块更小、缩放更精确，每元素 4.5 位；MXFP4 每元素 4.25 位。"}, {"q": "本节的模拟中，有离群通道的激活上，INT4 g128 与 INT4 g16 相差近 8 dB。这主要说明了什么？", "options": ["FP16 缩放因子不够精确", "块越小，一个离群值能拖累的元素越少，块大小是影响误差的主要因素", "INT4 不适合量化激活", "SQNR 不是好的指标"], "answer": 1, "explain": "一组里混进一个离群值，整组的缩放就被撑大，其余元素只能落在 0 附近的少数格点上。"}, {"q": "在 Hopper（H100）上加载 NVFP4 的权重，能得到什么？", "options": ["FP4 Tensor Core 带来两倍于 FP8 的算力", "只能反量化后计算，相当于 weight-only 量化：省显存和带宽，不省算力", "无法加载", "自动转换为 MXFP4 计算"], "answer": 1, "explain": "FP4 Tensor Core 从 Blackwell 开始才有。"}, {"q": "MoE dispatch 前把激活量化为 FP4 再发送，主要节省的是：", "options": ["专家的计算量", "all-to-all 的通信量", "KV Cache 的显存", "调度的 CPU 开销"], "answer": 1, "explain": "通信量约为 BF16 的四分之一。到达后的计算本来就以 FP4 进行，量化不会浪费。"}]'></div>
 
 ## 延伸阅读
 

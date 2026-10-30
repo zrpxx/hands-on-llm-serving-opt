@@ -85,7 +85,7 @@ FlashAttention-4 针对 Blackwell，全部用 CuTe DSL 编写。它的抽象层�
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "与 Triton 相比，TileLang 在内存层次上的主要不同是：", "options": ["TileLang 不使用共享内存", "共享内存和寄存器显式声明，数据搬运用 T.copy 显式写出；Triton 中数据放在哪里由编译器决定", "TileLang 只能写逐元素算子", "两者没有区别"], "answer": 1, "explain": "TileLang 默认在 tile 层面写，需要时可以下探到线程级别，适合注意力这类复杂的 kernel。"}, {"q": "T.Pipelined(..., num_stages=3) 的作用是：", "options": ["把循环展开 3 次", "生成三级流水线：在计算当前块的同时，异步搬运后面的块", "用 3 个线程块计算", "把 K 切成 3 段"], "answer": 1, "explain": "在 Hopper 上会用到 TMA 异步搬运。级数越多越能掩盖延迟，但占用更多共享内存。"}, {"q": "推理引擎需要一个大小常见的 BF16 矩阵乘法。最合理的做法是：", "options": ["用 Triton 自己写一个", "优先使用 cuBLAS、CUTLASS、DeepGEMM 等现成的库", "用 CuTe DSL 从头写", "在 CPU 上计算"], "answer": 1, "explain": "自己写的 GEMM 很难超过这些高度调优的库。DSL 的价值在于融合、稀疏、注意力这类库覆盖不到的算子。"}]'></div>
 
 ## 延伸阅读
 

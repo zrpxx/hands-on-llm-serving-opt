@@ -70,7 +70,7 @@ vLLM 2026 年的 Model Runner V2 进一步把输入的准备搬到了 GPU 上：
 
 ## 自测
 
-<!--QUIZ-->
+<div class="llm-widget" data-widget="quiz" data-questions='[{"q": "异步调度时，CPU 准备第 N+1 步，第 N 步还没算完。下一步的输入 token 从哪里来？", "options": ["CPU 先随机猜一个", "CPU 只决定结构（哪些请求、几个 token、写到哪些块），token 的值由 GPU 把第 N 步的采样结果直接写进第 N+1 步的输入", "等第 N 步算完再准备", "用投机解码的草稿代替"], "answer": 1, "explain": "SGLang 称之为未来 token：CPU 用占位符，GPU 执行时替换成真实的值。"}, {"q": "异步调度会让一部分 token 被多算一步。这些 token 来自：", "options": ["被抢占的请求", "在第 N 步结束的请求：调度器要到处理第 N 步结果时才知道，第 N+1 步已经把它们排进去了", "prefill 的请求", "投机解码被拒绝的草稿"], "answer": 1, "explain": "每个请求最多多算一步，请求越长，这部分的占比越小。"}, {"q": "每步的 CPU 工作已经比 GPU 前向还长。异步调度后每一步的耗时约为：", "options": ["GPU 前向的时间", "CPU 工作的时间：异步只能把较短的一方藏在较长的一方背后", "CPU 与 GPU 时间之和", "两者之差"], "answer": 1, "explain": "这时要减少 CPU 工作本身，比如把输入的准备搬到 GPU 上（vLLM Model Runner V2）。"}]'></div>
 
 ## 延伸阅读
 

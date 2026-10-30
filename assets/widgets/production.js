@@ -159,7 +159,7 @@
           <div class="lw-stat ok"><div class="lw-stat-label">EPLB 的均衡度</div><div class="lw-stat-value">${bal(gl).toFixed(2)}</div></div>
           <div class="lw-stat"><div class="lw-stat-label">最热的专家</div><div class="lw-stat-value">${hotShare.toFixed(1)} 倍</div><div class="lw-stat-sub">相对于平均专家的负载</div></div>
         </div>
-        <div class="lw-callout">MoE 层要等最忙的那张卡算完，均衡度就是算力的有效利用率。${st.red === 0 ? '没有冗余槽位时，EPLB 只能调整专家的位置，把热专家和冷专家搭配在一起；单个专家本身太热时，无论放在哪张卡都是瓶颈。' : `冗余副本把最热的专家分摊到多张卡上，代价是每卡多存 ${st.red} 个专家的权重。这里假设热度已知且不变；实际中热度随请求内容漂移，要定期重新统计、重新放置。`}</div>`;
+        <div class="lw-callout">MoE 层要等最忙的那张卡算完，均衡度就是算力的有效利用率。${st.red === 0 ? '没有冗余槽位时，EPLB 只能调整专家的位置，把热专家和冷专家搭配在一起；单个专家本身太热时，无论放在哪张卡都是瓶颈。' : `冗余副本把最热的专家分摊到多张卡上，代价是每卡多存 ${st.red} 个专家的权重。这里假设热度已知且不变，均衡度是理想值；实际中每一步的路由都有随机波动，热度也随请求内容漂移，要定期重新统计、重新放置。`}</div>`;
     }
     ['skew', 'red'].forEach((k) => $(`[data-${k}]`).addEventListener('input', (e) => { st[k] = +e.target.value; update(); }));
     $('[data-gpus]').addEventListener('change', (e) => { st.gpus = +e.target.value; update(); });
@@ -168,12 +168,12 @@
 
   // ------------------------------------------------------------------ 6.4 AFD
   W.register('afd-pingpong', function (container) {
-    const st = { ta: 3, tf: 2, comm: 1, mb: 2 };
+    const st = { ta: 3, tf: 3, comm: 0.25, mb: 2 };
     const LAYERS = 4;
     container.innerHTML = `
       <div class="lw-card">
         <div class="lw-header"><h4 class="lw-title">Attention 与 FFN 分离后的微批流水线</h4></div>
-        <p class="lw-subtitle">一组卡只算 Attention，另一组只算 FFN（MoE）。每一层的数据要先发给 FFN 一侧，算完再发回来。只有一个 batch 时，一侧计算，另一侧就在等。把 batch 切成几个微批，就能让两侧交替工作，同时用计算掩盖通信。图中画了 ${LAYERS} 层，时间单位任意。</p>
+        <p class="lw-subtitle">一组卡只算 Attention，另一组只算 FFN（MoE）。每一层的数据要先发给 FFN 一侧，算完再发回来。只有一个 batch 时，一侧计算，另一侧就在等。把 batch 切成几个微批，就能让两侧交替工作，同时用计算掩盖通信。图中只画了 ${LAYERS} 层，流水线首尾的填充和排空占比偏大；实际模型有几十层，利用率会更高。时间单位任意。</p>
         <div class="lw-controls">
           ${slider('Attention 每层耗时（整个 batch）', 'ta', 1, 10, 0.5, st.ta)}
           ${slider('FFN 每层耗时（整个 batch）', 'tf', 1, 10, 0.5, st.tf)}
@@ -351,12 +351,12 @@
   W.register('fp-order', function (container) {
     const st = { b: 1, inv: false };
     const N = 64;
-    const r = rng(21);
-    const vals = Array.from({ length: N }, () => Math.fround(gauss(r) * Math.pow(10, Math.floor(r() * 5) - 1)));
+    const r = rng(5);
+    const vals = Array.from({ length: N }, () => Math.fround(gauss(r) * Math.pow(10, Math.floor(r() * 6) - 2)));
     container.innerHTML = `
       <div class="lw-card">
         <div class="lw-header"><h4 class="lw-title">同一行点积，换一个 batch 就变了</h4></div>
-        <p class="lw-subtitle">矩阵乘法中，输出的每个元素都是一个长度为 K 的点积。这里取 K = 64 个乘积（量级从 0.1 到 1000 不等），用 FP32 累加。GPU 的 kernel 会根据 batch 大小选择不同的切分：batch 小时把 K 切成多段并行累加（split-K），再把各段的部分和相加。</p>
+        <p class="lw-subtitle">矩阵乘法中，输出的每个元素都是一个长度为 K 的点积。这里取 K = 64 个乘积（量级从 0.01 到几千不等），用 FP32 累加。GPU 的 kernel 会根据 batch 大小选择不同的切分：batch 小时把 K 切成多段并行累加（split-K），再把各段的部分和相加。</p>
         <div class="lw-controls">${slider('这一步的 batch 大小', 'b', 1, 512, 1, st.b)}</div>
         ${tabs('m', [['0', '分段数由 batch 决定'], ['1', '批不变：始终分 4 段']])}
         <div data-res></div>
