@@ -34,7 +34,7 @@
 </div>
 
 <h2 class="home-section-title">课程地图</h2>
-<p class="home-section-note">第 0～4 部分已经写完；其余部分目前是提纲，学习时边读书边补充。</p>
+<p class="home-section-note">第 0～5 部分已经写完；其余部分目前是提纲，学习时边读书边补充。</p>
 
 <div class="llm-widget" data-widget="course-map"></div>
 
