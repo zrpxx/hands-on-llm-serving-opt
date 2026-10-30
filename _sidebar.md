@@ -83,4 +83,3 @@
   * [术语表](appendix/glossary.md)
   * [论文与资料](appendix/papers.md)
   * [常用估算公式](appendix/cheatsheet.md)
-  * [学习日志](appendix/journal.md)
