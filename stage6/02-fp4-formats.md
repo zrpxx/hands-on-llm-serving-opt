@@ -91,7 +91,7 @@ vLLM 在 GB200 上部署 DeepSeek-R1 时的做法很有代表性：MoE 专家的
 
 ## 延伸阅读
 
-- [OCP Microscaling Formats (MX) Specification v1.0](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf)，2023。
+- OCP, [AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm Standardize Next-Generation Narrow Precision Data Formats for AI](https://www.opencompute.org/index.php/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai)，2023。MX 规范的发布公告，规范全文可从 OCP 网站下载。
 - Rouhani et al., [Microscaling Data Formats for Deep Learning](https://arxiv.org/abs/2310.10537), 2023。
 - NVIDIA, [Introducing NVFP4 for Efficient and Accurate Low-Precision Inference](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/), 2025。
 - vLLM 团队，[Driving vLLM WideEP and Large-Scale Serving Toward Maturity on Blackwell (Part I)](https://vllm.ai/blog/2026-02-03-dsr1-gb200-part1)，2026。
