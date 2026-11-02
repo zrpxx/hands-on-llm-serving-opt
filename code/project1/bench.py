@@ -10,7 +10,7 @@ prompt 直接用随机 token id 构造，保证输入长度精确；配合 ignor
     # 闭环：固定 16 个并发
     python bench.py ... --request-rate inf --max-concurrency 16
 
-    # 所有请求共享 1024 token 的前缀（用于 1.7 节的前缀缓存实验）
+    # 所有请求共享 1024 token 的前缀（用于 1.4 节的前缀缓存实验）
     python bench.py ... --shared-prefix-len 1024
 """
 import argparse

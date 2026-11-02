@@ -20,6 +20,7 @@ DEVICE = "cuda" if _cuda else "cpu"
 
 @pytest.fixture
 def device():
+    pytest.importorskip("triton", reason="Triton 未安装（macOS 无官方 wheel，可在 Linux CPU/GPU 上运行步骤 1~5）")
     return DEVICE
 
 

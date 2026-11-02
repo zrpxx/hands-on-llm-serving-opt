@@ -89,6 +89,7 @@ def run(mode, args):
             if not running and not pending:
                 gpu.done.get()
                 postprocess(nxt)
+                step += 1
                 break
     elapsed = time.perf_counter() - t0
     return elapsed, gpu.busy / elapsed, useful, wasted, step

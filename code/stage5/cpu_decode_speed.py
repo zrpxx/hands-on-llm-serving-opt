@@ -40,7 +40,7 @@ def main():
                       tie_word_embeddings=True)
     model = Qwen3ForCausalLM(cfg).to(dt).eval()
     n = sum(p.numel() for p in model.parameters())
-    w_bytes = (n - cfg.vocab_size * a.hidden) * dt.itemsize + cfg.vocab_size * a.hidden * dt.itemsize   # 嵌入只读一行，输出头读全部
+    w_bytes = (n - (0 if cfg.tie_word_embeddings else cfg.vocab_size * a.hidden)) * dt.itemsize   # 嵌入只读一行，输出头读全部
     with torch.no_grad():
         cache = DynamicCache()
         out = model(torch.tensor([[1, 2, 3, 4]]), past_key_values=cache, use_cache=True)

@@ -89,8 +89,8 @@ python tools/trace.py --impl solution --prompts 6,6,20 --budget 10 --blocks 12 -
 改几个参数再观察，直到你能**提前预测**每一步的输出：
 
 ```bash
-python tools/trace.py --impl solution --prompts 6,6,20 --budget 10 --blocks 12 --no-chunk   # 不切块：C 永远进不来，想想为什么
-python tools/trace.py --impl solution --prompts 6,6,20 --budget 32 --blocks 12 --no-chunk   # 预算足够时再看一次
+python tools/trace.py --impl solution --prompts 6,6,20 --budget 10 --blocks 12 --no-chunk   # 不切块：预算 10 放不下 20，C 永远进不来
+python tools/trace.py --impl solution --prompts 6,6,20 --arrive 1,1,2 --budget 20 --blocks 12 --no-chunk  # 第 2 步 C 进来时只做 prefill，A 和 B 停顿一步
 python tools/trace.py --impl solution --prompts 8,8 --budget 100 --blocks 6 --max-tokens 12  # 块不够，会抢占
 python tools/trace.py --impl solution --prompts 4,4,4 --arrive 1,1,3 --policy static         # 静态批处理
 ```
@@ -323,9 +323,9 @@ def _admit(self, budget: int, allow_partial: bool):
 
 **目标**：按顺序遍历 `running`，给每个请求分配本步要处理的 token 数，直到预算用完。
 
-**文件**：`scheduler.py` 中的 `_schedule_running(budget, max_tokens_per_seq=None)`
+**文件**：`scheduler.py` 中的 `_schedule_running(budget)`
 
-这一步**先不处理抢占**：块不够时直接停止循环。第 6 步再回来把它改成抢占。`max_tokens_per_seq` 参数用不到，忽略即可。
+这一步**先不处理抢占**：块不够时直接停止循环。第 6 步再回来把它改成抢占。
 
 **先想清楚**
 
@@ -358,7 +358,7 @@ def _admit(self, budget: int, allow_partial: bool):
 <summary>参考代码（不含抢占的版本）</summary>
 
 ```python
-def _schedule_running(self, budget: int, max_tokens_per_seq=None):
+def _schedule_running(self, budget: int):
     scheduled, preempted, i = [], 0, 0
     while i < len(self.running) and budget > 0:
         seq = self.running[i]
@@ -876,17 +876,32 @@ curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"用一句话解释 KV Cache"}],"max_tokens":64}'
 ```
 
-### 11.3 第一组对比
+### 11.3 四组 GPU 性能实验
 
-用同一组参数分别压测 HF 基线和 MiniServe：
+按[项目 1 页面](stage1/boss-miniserve.md)第 5 节的要求，依次运行以下四组实验并记录数据：
 
 ```bash
-python baseline_hf.py --model ~/models/Qwen3-0.6B --port 8001     # 另开一个终端启动基线
-python bench.py --base-url http://localhost:8001 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 16 --vocab-size 32000
-python bench.py --base-url http://localhost:8000 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 16 --vocab-size 32000
+# 实验 1：与 HF 基线和 vLLM 对比（输入 512，输出 128，并发 32）
+python baseline_hf.py --model ~/models/Qwen3-0.6B --port 8001
+python bench.py --base-url http://localhost:8001 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 32 --vocab-size 32000
+python bench.py --base-url http://localhost:8000 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 32 --vocab-size 32000
+
+# 停掉 MiniServe 后启动 vLLM 对比
+vllm serve ~/models/Qwen3-0.6B --served-model-name qwen --max-model-len 4096 --port 8000
+python bench.py --base-url http://localhost:8000 --model qwen --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency 32 --vocab-size 32000
+
+# 实验 2：并发扫描（在 MiniServe 上测量吞吐与 TPOT 随并发的变化）
+for c in 1 2 4 8 16 32 64; do
+  python bench.py --base-url http://localhost:8000 --num-prompts 64 --input-len 512 --output-len 128 --max-concurrency $c --vocab-size 32000
+done
+
+# 实验 3：四种调度策略对比（命令见 1.2 节第 5 小节，把 --device cpu 换成默认的 cuda、模型换成 ~/models/Qwen3-0.6B）
+
+# 实验 4：显存核对（对比估算脚本与 MiniServe 启动日志中的 KV 块数）
+python ../stage0/estimate_memory.py ~/models/Qwen3-0.6B/config.json --gpu-mem 24 --max-len 4096
 ```
 
-两者输出吞吐的比值，就是项目页第 1 组实验要报告的数字。接下来回到 [项目 1 页面](stage1/boss-miniserve.md) 完成四组实验和报告。
+完成这四组实验后，回到[项目 1 页面](stage1/boss-miniserve.md)整理实验报告。
 
 ---
 

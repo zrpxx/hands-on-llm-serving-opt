@@ -192,7 +192,8 @@
       const W28 = Math.max(1, Math.round(w / 28)), H28 = Math.max(1, Math.round(h / 28));
       const tok = W28 * H28;
       const total = tok * st.n;
-      const prefill = (2 * 7.6e9 * (total + 50)) / (989e12 * 0.6);
+      const T = total + 50;
+      const prefill = (2 * 7.6e9 * T + 2 * 28 * 28 * 128 * T * T) / (989e12 * 0.6);
       $('[data-out]').innerHTML = `
         <div class="lw-stats">
           <div class="lw-stat"><div class="lw-stat-label">实际处理的分辨率</div><div class="lw-stat-value">${W28 * 28}×${H28 * 28}</div></div>

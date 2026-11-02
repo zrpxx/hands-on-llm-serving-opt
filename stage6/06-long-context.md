@@ -29,7 +29,7 @@ KV 能放下之后，decode 每生成一个 token，完整的注意力仍要把�
 
 - **滑动窗口**：只看最近的 $w$ 个 token。简单，但窗口外的信息完全看不到，通常与少数全局注意力层交替使用（如 Gemma、gpt-oss）。
 - **原生稀疏注意力（NSA）**：DeepSeek 在 2025 年初提出，每个 query 同时走三条分支：把远处的块压缩成摘要、根据摘要挑选最相关的几个块做细粒度注意力、以及一个滑动窗口。
-- **DeepSeek Sparse Attention（DSA）**：DeepSeek-V3.2 采用。一个很轻的**闪电索引器**（64 个头，FP8，用 ReLU 代替 softmax）为每个历史位置打分，每个 query 只对得分最高的 2048 个位置做完整的 MLA 注意力。按 DeepSeek 的估算，128K 上下文的 decode 成本降到约六分之一。
+- **DeepSeek Sparse Attention（DSA）**：DeepSeek-V3.2 采用。一个很轻的**闪电索引器**（64 个查询头以 MQA 方式共享同一个 128 维 FP8 索引键与 1 个 FP32 缩放因子，每层每 token 只需读 132 字节，并用 ReLU 代替 softmax）为每个历史位置打分，每个 query 只对得分最高的 2048 个位置做完整的 MLA 注意力。按 DeepSeek 的估算，128K 上下文的 decode 成本降到约六分之一。
 
 `long_context.py` 的第二部分用一个人为构造的例子演示了二者的区别：32K 个位置中有 8 个与当前 query 高度相关，都在最近 4096 个之外。
 
@@ -51,7 +51,10 @@ KV 能放下之后，decode 每生成一个 token，完整的注意力仍要把�
 
 ## 3. 一条序列切到多张卡：上下文并行
 
-prefill 一条 1M 的序列，计算量与长度的平方成正比，单卡要算很久。**上下文并行**（Context Parallelism，CP）把一条序列沿长度切成几段，分给几张卡，各自计算自己那一段的 query，KV 在卡之间传递（Ring Attention 就是一种实现：KV 块沿环形依次传给下一张卡，传输与计算重叠）。
+prefill 一条 1M 的序列，计算量与长度的平方成正比，单卡要算很久。**上下文并行**（Context Parallelism，CP）把一条序列沿长度切成几段，分给几张卡。常见的实现有两种：
+
+- **Ring Attention**：每张卡持有自己那一段的 Q、K、V，KV 块沿环形依次传给下一张卡，传输与块注意力计算重叠，并用在线 softmax 逐步更新结果；
+- **DeepSpeed-Ulysses**：在 QKV 投影之后通过一次 all-to-all 通信，从"按序列长度切分"转为"按注意力头切分"（每张卡拿到完整序列的几个头），算完注意力后再做一次 all-to-all 转回。生产中也常把两者组合（如 USP：机内 NVLink 用 Ulysses，跨机用 Ring Attention）。
 
 因果注意力带来一个负载问题：第 $i$ 个 token 要与前面 $i$ 个 token 计算，越靠后的 token 越贵。按顺序切分时，最后一张卡算得最多：
 

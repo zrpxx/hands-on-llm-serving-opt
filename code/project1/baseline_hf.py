@@ -1,6 +1,6 @@
 """基线服务：用 Hugging Face Transformers 逐个处理请求（无批处理）。
 
-对应项目 1 的步骤 1-1。接口与 MiniServe 相同，可以直接用 bench.py 压测。
+对应 1.1 节与项目 1。接口与 MiniServe 相同，可以直接用 bench.py 压测。
     python baseline_hf.py --model PATH --port 8001               # 使用 KV Cache
     python baseline_hf.py --model PATH --port 8001 --no-kv-cache  # 每步重算全部上下文
 """

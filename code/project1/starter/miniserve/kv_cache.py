@@ -18,16 +18,16 @@ class BlockAllocator:
         return len(self._free)
 
     def allocate(self) -> int:
-        # TODO(1-3)：
+        # TODO(第 1 步)：
         # 从空闲列表中取出一个物理块号；没有空闲块时抛出 RuntimeError。
         # 分步指南第 1 步，测试：pytest tests/test_steps.py -k step01
-        raise NotImplementedError("TODO(1-3): BlockAllocator.allocate")
+        raise NotImplementedError("TODO(第 1 步): BlockAllocator.allocate")
 
     def free(self, blocks: List[int]):
-        # TODO(1-3)：
+        # TODO(第 1 步)：
         # 把一组块号放回空闲列表。
         # 分步指南第 1 步，测试：pytest tests/test_steps.py -k step01
-        raise NotImplementedError("TODO(1-3): BlockAllocator.free")
+        raise NotImplementedError("TODO(第 1 步): BlockAllocator.free")
 
 
 def allocate_kv_cache(cfg: ModelConfig, num_blocks: int, block_size: int,

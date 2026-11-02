@@ -18,7 +18,8 @@ def int_qparams(x: torch.Tensor, bits: int, symmetric: bool = True):
     """沿最后一维计算整数量化的 scale 和 zero（zero 为整数，对称量化时为 0）。
 
     对称：q ∈ [-2^(b-1), 2^(b-1)-1]，scale = max|x| / (2^(b-1)-1)
-    非对称：q ∈ [0, 2^b - 1]，scale = (max - min) / (2^b - 1)，zero = round(-min / scale)
+    非对称：q ∈ [0, 2^b - 1]，把 min 截断到 ≤ 0、max 截断到 ≥ 0 以保证 0 能被精确表示，
+            scale = (max - min) / (2^b - 1)，zero = round(-min / scale)
     """
     # TODO(第 1 步)：按 docstring 计算 scale 与 zero，形状与 x 相同，只是最后一维为 1（keepdim=True）
     # 提示：scale 要 clamp 一个很小的下限（如 1e-8），避免全零的组除以 0

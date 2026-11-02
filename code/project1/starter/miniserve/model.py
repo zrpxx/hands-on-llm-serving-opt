@@ -74,7 +74,7 @@ class Attention(nn.Module):
         q = q * cos + rotate_half(q) * sin
         k = k * cos + rotate_half(k) * sin
 
-        # TODO(1-3)：分页注意力
+        # TODO(第 8 步)：分页注意力
         # 1) 用 meta.slot_mapping 把本步新 token 的 k、v 写进 k_cache / v_cache（形状 [num_slots, n_kv, d]）
         # 2) prefill 组：对每个请求，按 meta.prefill_ctx_slots 取出完整上下文的 K、V，
         #    构造因果掩码（第 i 个新 token 的位置是 ctx - n + i），调用 F.scaled_dot_product_attention(..., enable_gqa=True)
@@ -82,7 +82,7 @@ class Attention(nn.Module):
         # 4) 把结果按行号写回 out（形状 [T, n_q, d]）
         out = torch.empty_like(q)
         # 分步指南第 8 步，测试：pytest tests/test_steps.py -k step08
-        raise NotImplementedError("TODO(1-3): Attention.forward 中的分页注意力")
+        raise NotImplementedError("TODO(第 8 步): Attention.forward 中的分页注意力")
 
         return self.o_proj(out.reshape(T, self.n_q * self.d))
 

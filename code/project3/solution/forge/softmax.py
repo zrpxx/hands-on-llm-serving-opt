@@ -30,6 +30,6 @@ def _online_softmax_kernel(x_ptr, out_ptr, D, BLOCK: tl.constexpr):
 def online_softmax(x: torch.Tensor, block: int = 128) -> torch.Tensor:
     """x: [N, D]，沿最后一维做 softmax。"""
     assert x.is_contiguous() and x.dim() == 2
-    out = torch.empty_like(x, dtype=torch.float32)
+    out = torch.empty_like(x)
     _online_softmax_kernel[(x.shape[0],)](x, out, x.shape[1], BLOCK=block)
-    return out.to(x.dtype)
+    return out

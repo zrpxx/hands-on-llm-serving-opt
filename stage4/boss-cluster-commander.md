@@ -86,7 +86,7 @@ CLUSTER_IMPL=solution python run.py routers        # 看一眼实验的输出
 python run.py routers
 ```
 
-应该得到与 4.6 节第 3 节相近的结果：两种按前缀的路由命中率约 0.83，轮询约 0.58；缓存感知的 TTFT P99 最低。
+应该得到与 4.6 节第 3 小节相近的结果：两种按前缀的路由命中率约 0.83，轮询约 0.58；缓存感知的 TTFT P99 最低。
 
 ### 第 4 步：PD 分离
 

@@ -57,11 +57,11 @@
         for (let i = s; i < s + n; i++) amax = Math.max(amax, Math.abs(x[i]));
         if (amax === 0) continue;
         let sc;
-        if (fmt === 'int') sc = f16(amax / 7);
+        if (fmt === 'int' || fmt === 'int16') sc = f16(amax / 7);
         else if (fmt === 'mx') sc = 2 ** (Math.floor(Math.log2(amax)) - 2);
         else { const g = gmax / (6 * 448); sc = e4m3(amax / 6 / g) * g; }
         for (let i = s; i < s + n; i++) {
-          const q = fmt === 'int' ? Math.max(-8, Math.min(7, Math.round(x[i] / sc))) * sc : toGrid(Math.max(-6, Math.min(6, x[i] / sc))) * sc;
+          const q = (fmt === 'int' || fmt === 'int16') ? Math.max(-8, Math.min(7, Math.round(x[i] / sc))) * sc : toGrid(Math.max(-6, Math.min(6, x[i] / sc))) * sc;
           num += x[i] * x[i]; den += (x[i] - q) ** 2;
         }
       }
@@ -76,6 +76,7 @@
       for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { const v = base[r * C + c] * (hot.has(c) ? st.mag : 1); x[r * C + c] = v; gmax = Math.max(gmax, Math.abs(v)); }
       const rows = [
         ['INT4，每 128 个一组，FP16 缩放', 4.125, quant(x, 'int', gmax)],
+        ['INT4，每 16 个一组，FP16 缩放（对照）', 5.0, quant(x, 'int16', gmax)],
         ['MXFP4：E2M1，每 32 个一组，E8M0 缩放', 4.25, quant(x, 'mx', gmax)],
         ['NVFP4：E2M1，每 16 个一组，E4M3 缩放 + 张量级 FP32', 4.5, quant(x, 'nv', gmax)],
       ];
@@ -86,8 +87,8 @@
           <tbody>${rows.map((r) => `<tr${r[2] === best ? ' class="lw-row-hi"' : ''}><td>${r[0]}</td><td>${r[1].toFixed(3)}</td><td>${r[2].toFixed(1)} dB</td></tr>`).join('')}</tbody>
         </table></div>
         <div class="lw-callout">${st.frac === 0 || st.mag === 1
-          ? '没有离群值时，三者相差不大：E2M1 的 15 个取值不是等间距的，对正态分布未必比 INT4 的等间距网格好。'
-          : '有离群通道时，一个组里只要混进一个离群值，整组的缩放因子就被它撑大，其余元素只能落在最靠近 0 的几个格点上。组越小，被拖累的元素越少：NVFP4 每 16 个一组，几乎不受影响。MXFP4 的缩放因子只能是 2 的幂，最多浪费将近一位的精度。'}</div>`;
+          ? '没有离群值时，块大小相同的 INT4 g16 甚至略优于 NVFP4：E2M1 的 15 个非重实数取值不是等间距的，对标准正态分布未必比 INT4 的等间距网格更准。'
+          : '有离群通道时，一个组里只要混进一个离群值，整组的缩放因子就被它撑大，其余元素只能落在最靠近 0 的几个格点上。组越小，被拖累的元素越少：NVFP4 和 INT4 g16 每 16 个一组，几乎不受影响，而 NVFP4 的缩放因子比 INT4 g16 省了 0.5 位。MXFP4 的缩放因子只能是 2 的幂，最多浪费将近一位的精度。'}</div>`;
     }
     ['mag', 'frac'].forEach((k) => $(`[data-${k}]`).addEventListener('input', (e) => { st[k] = +e.target.value; update(); }));
     update();
@@ -311,6 +312,7 @@
       qwen235: { name: 'Qwen3-235B-A22B（GQA）', kv: 94 * 2 * 4 * 128 * 2, idx: 0 },
       dsv3: { name: 'DeepSeek-V3（MLA）', kv: 61 * 576 * 2, idx: 0 },
       dsv32: { name: 'DeepSeek-V3.2（MLA + DSA）', kv: 61 * 576 * 2, idx: 61 * (128 + 4) },
+      dsv41: { name: 'DeepSeek-V4.1-Flash（全局 KV，FP4）', kv: 890, idx: 0 },
     };
     const st = { model: 'dsv32', logc: 17 };
     container.innerHTML = `

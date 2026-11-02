@@ -84,7 +84,7 @@ batch 大到受算力限制时，验证 $K+1$ 个 token 的耗时不再与验证
 
 $$2 \times \frac{N-1}{N} \times b \times d \times B \text{ 字节}$$
 
-**MoE 每个专家分到的 token**（4.2、6.3 节）：全局 batch 为 $b$，每个 token 选 $k$ 个，共 $E$ 个专家时为 $bk/E$。这也约等于 MoE 层的算术强度。
+**MoE 每个专家分到的 token**（4.2、6.3 节）：全局 batch 为 $b$，每个 token 选 $k$ 个，共 $E$ 个专家时为 $bk/E$。BF16 权重下这也约等于 MoE 层的算术强度（FP8 权重下算术强度翻倍为 $2bk/E$）。
 
 **PD 分离的 KV 传输**（4.3 节）
 
@@ -102,5 +102,5 @@ $$t_{\text{transfer}} \approx \frac{s \times m_{\text{KV}}}{\text{链路带宽}}
 | 每个 token 的 KV（36 层，8 个 KV 头，头维度 128） | 2 × 36 × 8 × 128 × 2 字节 = 144 KB |
 | 能放下的 KV | (80 × 0.9 − 16 − 2) GB ÷ 144 KB ≈ 37 万个 token |
 | batch 为 1 时 decode 的下限 | 16 GB ÷ 3.35 TB/s ≈ 5 ms，即每秒约 200 个 token |
-| 线性层转为受算力限制的 batch | 约 300 个 token 的 batch（按峰值算力；按实际效率约为 200） |
+| 线性层转为受算力限制的 batch | 约 300～345 个 token 的 batch（按峰值算力；按实际效率约为 200） |
 | 4K 输入的 prefill | 2 × 8.2B × 4096 ÷ (989 TFLOPS × 0.6) ≈ 113 ms |

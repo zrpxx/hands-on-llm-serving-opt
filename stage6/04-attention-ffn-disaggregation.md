@@ -18,7 +18,7 @@ python code/stage6/afd_balance.py
 ```
 
 ```text
-上下文 4096 token，EP = 32；H800 的平衡点约 591 FLOP/字节
+上下文 4096 token，EP = 32；H800 的平衡点：BF16 约 295、FP8 约 591 FLOP/字节
 
 Qwen3-235B-A22B
   每卡 batch    Attention 强度    MoE 强度   Attention       MoE
@@ -35,7 +35,7 @@ DeepSeek-V3
       1024             242      2048      1442 us     365 us
 ```
 
-两个模型的情况不同。Qwen3-235B 的 Attention 始终受限于带宽，耗时随 batch 线性增长，很快就成了一层中的大头；而 32 张卡分摊之后，MoE 的耗时很小。DeepSeek-V3 的 MLA 算术强度高得多，Attention 与 MoE 的耗时在 batch 一两百时相当。
+两个模型的情况不同。Qwen3-235B 的 Attention 算术强度只有 16，远低于 BF16 平衡点（295），始终受限于带宽，耗时随 batch 线性增长，很快就成了一层中的大头；而 32 张卡分摊之后，MoE 的耗时很小。DeepSeek-V3 的 MLA 算术强度高达 242（已接近 BF16 平衡点 295；若用 FP8 FlashMLA 则算术强度翻倍为 484，同样接近 FP8 平衡点 591），Attention 与 MoE 的耗时在每卡 batch 一两百时相当。
 
 ## 2. 拆开的理由
 

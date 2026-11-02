@@ -39,11 +39,11 @@ class AsyncEngine:
         self.thread.start()
 
     def _loop(self):
-        # TODO(1-4)：
+        # TODO(第 10 步)：
         # 后台线程主循环：没有任务时阻塞等待 inbox；处理完 inbox 中的全部命令后执行一次 engine.step()，
         # 把每个输出交给 _dispatch。
         # 分步指南第 10 步，测试：pytest tests/test_steps.py -k step10
-        raise NotImplementedError("TODO(1-4): AsyncEngine._loop")
+        raise NotImplementedError("TODO(第 10 步): AsyncEngine._loop")
 
     def _handle(self, cmd):
         kind = cmd[0]
@@ -60,11 +60,11 @@ class AsyncEngine:
             self.streams.pop(cmd[1], None)
 
     def _dispatch(self, out: StepOutput):
-        # TODO(1-4)：
+        # TODO(第 10 步)：
         # 把一个 StepOutput 投递到对应请求的 asyncio.Queue（注意跨线程要用 loop.call_soon_threadsafe）；
         # 请求结束后从 self.streams 中移除。
         # 分步指南第 10 步，测试：pytest tests/test_steps.py -k step10
-        raise NotImplementedError("TODO(1-4): AsyncEngine._dispatch")
+        raise NotImplementedError("TODO(第 10 步): AsyncEngine._dispatch")
 
     async def generate(self, prompt_ids: List[int], params: SamplingParams, seq_id: str) -> AsyncIterator:
         q: asyncio.Queue = asyncio.Queue()

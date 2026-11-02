@@ -1,6 +1,6 @@
 # 项目 3　Kernel Forge：用 Triton 写推理算子，实现投机解码
 
-> 前置：3.2～3.4 节。代码在 [`code/project3`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project3)。全部开发和正确性测试都可以在 CPU 上完成：没有 GPU 时，测试会自动用 Triton 的解释器运行 kernel。性能测试需要 NVIDIA GPU。
+> 前置：3.2～3.6 节。代码在 [`code/project3`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project3)。全部开发和正确性测试都可以在 CPU 上完成：没有 GPU 时，测试会自动用 Triton 的解释器运行 kernel。性能测试需要 NVIDIA GPU。
 
 这个项目有两部分。前五步用 Triton 写推理中最关键的几个算子：融合的 RMSNorm、SwiGLU、在线 softmax、FlashAttention 的前向，以及分页 KV Cache 上的 decode 注意力。最后一步用 PyTorch 实现投机解码的验证逻辑，在两个小模型上测量接受率。
 
@@ -125,7 +125,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 ### 第 5 步：分页 decode 注意力
 
-每个 program 负责一个序列的一个查询头。KV 缓存的布局和项目 1 相同：`[num_blocks, block_size, H_kv, D]`，`block_tables[b, j]` 是序列 b 的第 j 个逻辑块的物理块号。循环遍历这个序列的每一个逻辑块，读出物理块中第 `kvh` 个头的 K、V，做在线 softmax。
+每个 program 负责一个序列的一个查询头。KV 缓存的内存布局和项目 1 相同（把项目 1 的三维 `[num_blocks * block_size, H_kv, D]` 展开成四维视图 `[num_blocks, block_size, H_kv, D]`），`block_tables[b, j]` 是序列 b 的第 j 个逻辑块的物理块号。循环遍历这个序列的每一个逻辑块，读出物理块中第 `kvh` 个头的 K、V，做在线 softmax。
 
 <details>
 <summary>提示 1：地址怎样算</summary>

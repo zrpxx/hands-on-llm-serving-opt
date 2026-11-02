@@ -155,18 +155,38 @@
       container.innerHTML = '<div class="lw-error">自测题数据格式有误：data-questions 不是合法 JSON。题目中的 $ 需要写成 &amp;#36;，否则会被公式插件提前替换。</div>';
       return;
     }
-    const title = container.getAttribute('data-title') || '自测';
+    const title = container.getAttribute('data-title') || '本节自测';
     const orders = questions.map((q) => shuffledOrder(q.options.length, hash(q.q)));
-    const picked = {};
+    const routeKey = (location.hash || '#/').replace(/^#\//, '').split('?')[0] || 'home';
+    const QUIZ_STORE_KEY = 'llmopt-quiz-v1';
+    let store = {};
+    try { store = JSON.parse(localStorage.getItem(QUIZ_STORE_KEY) || '{}'); } catch (e) { store = {}; }
+    const picked = Object.assign({}, store[routeKey] || {});
+
+    function savePicked() {
+      try {
+        const all = JSON.parse(localStorage.getItem(QUIZ_STORE_KEY) || '{}');
+        if (Object.keys(picked).length) all[routeKey] = picked;
+        else delete all[routeKey];
+        localStorage.setItem(QUIZ_STORE_KEY, JSON.stringify(all));
+      } catch (e) {}
+    }
 
     function render() {
       const correct = questions.filter((q, i) => picked[i] === q.answer).length;
       const answered = Object.keys(picked).length;
+      const allCorrect = answered === questions.length && correct === questions.length && questions.length > 0;
       container.innerHTML = `
-        <div class="lw-card lw-quiz-card">
+        <div class="lw-card lw-quiz-card${allCorrect ? ' is-all-correct' : ''}">
           <div class="lw-header">
-            <h4 class="lw-title">${escapeHtml(title)}</h4>
-            <div class="lw-quiz-score">${answered ? `答对 <strong>${correct}</strong> / ${questions.length}` : `共 ${questions.length} 题`}</div>
+            <div class="lw-title-group">
+              <h4 class="lw-title">${escapeHtml(title)}</h4>
+              ${allCorrect ? '<span class="lw-quiz-badge">全部答对</span>' : ''}
+            </div>
+            <div class="lw-quiz-meta">
+              <span class="lw-quiz-score">${answered ? `答对 <strong>${correct}</strong> / ${questions.length}` : `共 ${questions.length} 题`}</span>
+              ${answered ? `<button type="button" class="lw-quiz-reset" data-reset-all>重置</button>` : ''}
+            </div>
           </div>
           <div class="lw-quiz-list">
             ${questions.map((q, qi) => {
@@ -190,7 +210,7 @@
                   </div>
                   ${has ? `
                     <div class="lw-quiz-explain ${right ? 'exp-ok' : 'exp-err'}">
-                      <strong>${right ? '正确。' : '不对。'}</strong>${q.explain}
+                      <strong>${right ? '回答正确。' : '回答有误。'}</strong>${q.explain}
                     </div>
                     ${right ? '' : `<button type="button" class="lw-quiz-retry" data-retry="${qi}">重新作答</button>`}` : ''}
                 </div>`;
@@ -201,15 +221,25 @@
       container.querySelectorAll('.lw-quiz-opt').forEach((btn) => {
         btn.addEventListener('click', () => {
           picked[Number(btn.dataset.q)] = Number(btn.dataset.o);
+          savePicked();
           render();
         });
       });
       container.querySelectorAll('[data-retry]').forEach((btn) => {
         btn.addEventListener('click', () => {
           delete picked[Number(btn.dataset.retry)];
+          savePicked();
           render();
         });
       });
+      const resetAll = container.querySelector('[data-reset-all]');
+      if (resetAll) {
+        resetAll.addEventListener('click', () => {
+          Object.keys(picked).forEach((k) => delete picked[k]);
+          savePicked();
+          render();
+        });
+      }
     }
 
     render();

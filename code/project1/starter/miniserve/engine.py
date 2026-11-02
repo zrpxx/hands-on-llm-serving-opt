@@ -151,12 +151,12 @@ class LLMEngine:
         return outputs
 
     def _prepare_inputs(self, sched: SchedulerOutput):
-        # TODO(1-3)：
+        # TODO(第 7 步)：
         # 把调度结果展平成一次前向的输入：input_ids、positions、slot_mapping，
         # 以及 AttentionMetadata 中 prefill 与 decode 两组所需的槽位信息；同时记录哪些请求需要采样、取哪一行的 hidden。
         # 返回 (input_ids, positions, meta, sample_seqs, sample_rows)。
         # 分步指南第 7 步，测试：pytest tests/test_steps.py -k step07
-        raise NotImplementedError("TODO(1-3): LLMEngine._prepare_inputs")
+        raise NotImplementedError("TODO(第 7 步): LLMEngine._prepare_inputs")
 
     def _sample(self, logits: torch.Tensor, params: List[SamplingParams]) -> torch.Tensor:
         greedy = logits.argmax(dim=-1)

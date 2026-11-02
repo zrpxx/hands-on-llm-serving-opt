@@ -1,6 +1,6 @@
 """对小模型做 2:4 稀疏剪枝，比较两种准则的困惑度。对应 2.8 节。
 
-    python tools/prune_24.py --model /tmp/tiny-lm --data /tmp/qcorpus
+    python tools/prune_24.py --model /tmp/tiny-lm --data data
 
 准则：
 - magnitude：每 4 个权重中保留绝对值最大的 2 个；

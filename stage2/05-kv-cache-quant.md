@@ -85,8 +85,8 @@ KVQuant 进一步发现，K 的离群通道在 RoPE 之前更明显、更规整�
 
 ```bash
 cd code/project2
-QUANTLAB_IMPL=solution python run.py --model /tmp/tiny-lm --data /tmp/qcorpus --kv-bits 4 --k-axis channel
-QUANTLAB_IMPL=solution python run.py --model /tmp/tiny-lm --data /tmp/qcorpus --kv-bits 4 --k-axis token
+QUANTLAB_IMPL=solution python run.py --model /tmp/tiny-lm --data data --kv-bits 4 --k-axis channel
+QUANTLAB_IMPL=solution python run.py --model /tmp/tiny-lm --data data --kv-bits 4 --k-axis token
 ```
 
 小模型上的结果（不量化时困惑度 37.98）：

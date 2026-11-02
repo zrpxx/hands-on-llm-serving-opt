@@ -527,9 +527,13 @@
         : Array.from({ length: C }, (_, c) => M.map((_, t) => [t, c]));
       groups.forEach((g) => {
         const vals = g.map(([t, c]) => M[t][c]);
-        const lo = Math.min(...vals), hi = Math.max(...vals);
+        const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
         const sc = (hi - lo) / L || 1e-8;
-        g.forEach(([t, c]) => { out[t][c] = Math.round((M[t][c] - lo) / sc) * sc + lo; });
+        const zero = Math.round(-lo / sc);
+        g.forEach(([t, c]) => {
+          const q = Math.max(0, Math.min(L, Math.round(M[t][c] / sc) + zero));
+          out[t][c] = (q - zero) * sc;
+        });
       });
       return out;
     }
@@ -711,14 +715,14 @@
     const GP = W.GPUS || {}, MD = W.MODELS || {};
     if (!W.modelParams) { container.innerHTML = '<div class="lw-card">需要先加载 basics.js。</div>'; return; }
     const st = { model: MD['qwen3-32b'] ? 'qwen3-32b' : Object.keys(MD)[0], gpu: GP.l40s ? 'l40s' : Object.keys(GP)[0], goal: 'latency', ctx: 8192 };
-    const GiB = 1024 ** 3;
+    const GB = 1e9;
 
     function plans(m, g) {
       const p = W.modelParams(m);
       const body = p.attn + p.mlp;                     // 被量化的线性层
       const keep = (p.emb + p.head) * 2;               // 词表和输出头保持 BF16
       const kvTok = 2 * m.L * m.nkv * m.dh;            // 每个 token 的 KV 元素数
-      const usable = g.mem * 1e9 * 0.9 - 2 * GiB;      // 留 10% 和约 2 GiB 给激活、CUDA Graph 等
+      const usable = g.mem * GB * 0.9 - 2 * GB;        // 留 10% 和约 2 GB 给激活、CUDA Graph 等
       const rows = [
         { key: 'bf16', name: 'BF16', wb: 2, kvb: 2, compute: 'BF16' },
         { key: 'fp8', name: 'FP8 W8A8', wb: 1, kvb: 2, compute: g.fp8 ? 'FP8' : 'BF16（按 W8A16 运行）' },
@@ -755,7 +759,7 @@
     container.innerHTML = `
       <div class="lw-card">
         <div class="lw-header"><h4 class="lw-title">选择量化方案</h4></div>
-        <p class="lw-subtitle">单张显卡，按显存的 90% 减去约 2 GiB 的运行时开销计算可用空间；词表和输出头保持 BF16。"并发请求数"指每个请求都用满所选上下文长度时，KV Cache 能同时容纳多少个。</p>
+        <p class="lw-subtitle">单张显卡，按显存的 90% 减去约 2 GB 的运行时开销计算可用空间；词表和输出头保持 BF16。"并发请求数"指每个请求都用满所选上下文长度时，KV Cache 能同时容纳多少个。</p>
         <div class="lw-controls">
           <div class="lw-control"><label>模型</label><select data-model>${Object.keys(MD).map((k) => `<option value="${k}" ${k === st.model ? 'selected' : ''}>${MD[k].name}</option>`).join('')}</select></div>
           <div class="lw-control"><label>GPU</label><select data-gpu>${Object.keys(GP).map((k) => `<option value="${k}" ${k === st.gpu ? 'selected' : ''}>${GP[k].name}</option>`).join('')}</select></div>
@@ -779,7 +783,7 @@
           <thead><tr><th>方案</th><th>权重</th><th>矩阵乘法</th><th>KV Cache 可容纳</th><th>并发请求数</th></tr></thead>
           <tbody>${rows.map((r) => `<tr${r.key === rec.key ? ' class="lw-row-hi"' : ''}${r.fits ? '' : ' style="opacity:0.5"'}>
             <td>${r.name}${r.key === rec.key ? '（推荐）' : ''}</td>
-            <td>${(r.weights / GiB).toFixed(1)} GiB</td>
+            <td>${(r.weights / GB).toFixed(1)} GB</td>
             <td>${r.compute}</td>
             <td>${r.fits ? `${(r.kvTokens / 1e4).toFixed(1)} 万 token` : '放不下'}</td>
             <td>${r.fits ? r.reqs : '-'}</td></tr>`).join('')}</tbody>

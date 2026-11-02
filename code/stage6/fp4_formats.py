@@ -24,12 +24,14 @@ def round_to_grid(x, grid):
 
 
 def to_e4m3(s):
-    """把正数舍入到 FP8 E4M3 能表示的值（最大 448，最小正规数 2^-6，带次正规数）。"""
+    """把非负数舍入到 FP8 E4M3 能表示的值（0，或最大 448、最小次正规数 2^-9）。"""
+    zero = s <= 0
     s = np.clip(s, 2.0 ** -9, 448.0)
     e = np.floor(np.log2(s))
     e = np.maximum(e, -6)                  # 次正规数区间，步长固定为 2^-9
     step = 2.0 ** (e - 3)                  # 3 位尾数
-    return np.clip(np.round(s / step) * step, 2.0 ** -9, 448.0)
+    out = np.clip(np.round(s / step) * step, 2.0 ** -9, 448.0)
+    return np.where(zero, 0.0, out)
 
 
 def blocks(x, size):

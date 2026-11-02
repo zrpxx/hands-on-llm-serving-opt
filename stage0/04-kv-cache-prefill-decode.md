@@ -44,12 +44,12 @@ flowchart LR
 
 ## 3. 省了多少计算
 
-设 prompt 长度为 $s$，生成 $n$ 个 token，模型参数量为 $P$。只看线性层（每个 token 约 $2P$ 次运算）：
+设 prompt 长度为 $s$，生成 $n$ 个 token（共 $n$ 步，$k = 0, 1, \dots, n-1$），模型参数量为 $P$。只看线性层（每个 token 约 $2P$ 次运算）：
 
 | | 第 $k$ 步处理的 token 数 | 生成 $n$ 个 token 的总计算量 |
 |---|---|---|
-| 不用缓存 | $s + k$ | $\sum_{k=1}^{n} 2P(s+k) \approx 2P\left(sn + \dfrac{n^2}{2}\right)$ |
-| 使用 KV Cache | 第一步 $s$，之后每步 1 | $2P(s + n)$ |
+| 不用缓存 | $s + k$ | $\sum_{k=0}^{n-1} 2P(s+k) \approx 2P\left(sn + \dfrac{n^2}{2}\right)$ |
+| 使用 KV Cache | 第 0 步 $s$，之后每步 1 | $2P(s + n - 1) \approx 2P(s + n)$ |
 
 以 $s = 2000$、$n = 1000$ 为例：不用缓存相当于处理了约 250 万个 token，使用缓存只处理 3000 个，相差 800 多倍。
 
@@ -84,7 +84,7 @@ flowchart LR
 
 这张表也给后面的优化手段分了类：
 
-- 针对 prefill：前缀缓存，跳过重复的 prompt（1.4 节）；FlashAttention，降低长输入的注意力开销（3.2 节）；FP8 计算（2.5 节）。
+- 针对 prefill：前缀缓存，跳过重复的 prompt（1.4 节）；FlashAttention，降低长输入的注意力开销（3.2 节）；FP8 计算（2.4 节）。
 - 针对 decode：连续批处理，让多个请求共享一次权重读取（1.2 节）；权重量化与 KV Cache 量化，减少要读的字节（第 2 部分）；投机解码，一次验证多个 token（3.4 节）。
 - 两者互相干扰时：chunked prefill（1.2 节）、prefill 与 decode 分离部署（4.3 节）。
 
@@ -124,7 +124,7 @@ with torch.no_grad():
 print(tok.decode(generated[0], skip_special_tokens=True))
 ```
 
-第 0 步是 prefill，处理整个 prompt，耗时稍长；之后每一步的耗时基本不变，不再随长度增长。在 A100 上运行 Qwen3-0.6B，decode 每步大约在 10 ms 量级。对一个 0.6B 的模型来说这其实很慢，大部分时间花在 Python 逐层调用和启动 GPU kernel 上，而不是计算本身。这部分开销怎样消除，是 1.3 节和项目 1 讨论的内容。
+第 0 步是 prefill，处理整个 prompt，耗时稍长；之后每一步的耗时基本不变，不再随长度增长。在 A100 上运行 Qwen3-0.6B，decode 每步大约在 10 ms 量级。对一个 0.6B 的模型来说这其实很慢，大部分时间花在 Python 逐层调用和启动 GPU kernel 上，而不是计算本身。项目 1 会再次看到这一现象；消除这部分开销需要依靠算子融合、CUDA Graph（第 3 部分）和异步调度（6.8 节）。
 
 ## 6. KV Cache 带来的新问题
 

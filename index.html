@@ -20,9 +20,10 @@
   <!-- 所有依赖都托管在仓库内（assets/vendor），不依赖外部 CDN 与网络字体 -->
   <link rel="stylesheet" href="assets/vendor/docsify-vue.css" />
   <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
-  <link rel="stylesheet" href="assets/custom.css?v=20261030d" />
+  <link rel="stylesheet" href="assets/custom.css?v=20261102c" />
 </head>
 <body>
+  <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
   <div id="app">加载中…</div>
 
   <script>
@@ -123,11 +124,15 @@
       },
 
       plugins: [
-        // 主页使用独立版式；其余页面在标题下方显示"本节对应书中…"等元信息
+        // 主页使用独立版式；其余页面在标题下方显示"本节对应书中…"等元信息，并自动将当前章节滚动到侧边栏视野内
         function (hook, vm) {
           hook.doneEach(function () {
             var isHome = vm.route.path === '/' || vm.route.path === '/README';
             document.body.classList.toggle('is-home', isHome);
+            var active = document.querySelector('.sidebar-nav li.active > a');
+            if (active && active.scrollIntoView) {
+              try { active.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+            }
           });
         },
 
@@ -137,7 +142,11 @@
             if (window.mermaid) {
               try { window.mermaid.run({ querySelector: '.markdown-section .mermaid' }); } catch (e) {}
             }
-            if (window.LLMWidgets) window.LLMWidgets.mountAll();
+            if (window.LLMWidgets) {
+              window.LLMWidgets.mountAll();
+              var sec = document.querySelector('.markdown-section');
+              if (sec && window.LLMWidgets.renderMath) window.LLMWidgets.renderMath(sec);
+            }
           });
         },
 
@@ -229,19 +238,64 @@
               '<a href="https://github.com/zrpxx/hands-on-llm-serving-opt" target="_blank" rel="noopener">在 GitHub 上查看源文件</a></footer>';
           });
         },
+
+        // 顶部阅读进度条与键盘快捷键（/ 聚焦搜索，[ 与 ] 切换上一节/下一节）
+        function (hook) {
+          var bound = false;
+          function updateBar() {
+            var bar = document.getElementById('reading-progress-bar');
+            if (!bar) return;
+            var doc = document.documentElement;
+            var max = doc.scrollHeight - doc.clientHeight;
+            var pct = max > 40 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
+            bar.style.width = pct.toFixed(1) + '%';
+          }
+          hook.doneEach(function () {
+            updateBar();
+            if (bound) return;
+            bound = true;
+            window.addEventListener('scroll', updateBar, { passive: true });
+            window.addEventListener('resize', updateBar, { passive: true });
+            window.addEventListener('keydown', function (e) {
+              if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+              var tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+              if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable)) {
+                if (e.key === 'Escape') e.target.blur();
+                return;
+              }
+              if (e.key === '/') {
+                var input = document.querySelector('.sidebar .search input');
+                if (input) {
+                  e.preventDefault();
+                  if (document.body.classList.contains('close')) {
+                    document.body.classList.remove('close');
+                  }
+                  input.focus();
+                  input.select();
+                }
+              } else if (e.key === '[') {
+                var prev = document.querySelector('.pagination-item--previous a');
+                if (prev) prev.click();
+              } else if (e.key === ']') {
+                var next = document.querySelector('.pagination-item--next a');
+                if (next) next.click();
+              }
+            });
+          });
+        },
       ],
     };
   </script>
 
-  <script src="assets/widgets/core.js?v=20261030d"></script>
-  <script src="assets/widgets/home.js?v=20261030d"></script>
-  <script src="assets/widgets/basics.js?v=20261030d"></script>
-  <script src="assets/widgets/serving.js?v=20261030d"></script>
-  <script src="assets/widgets/compression.js?v=20261030d"></script>
-  <script src="assets/widgets/kernels.js?v=20261030d"></script>
-  <script src="assets/widgets/cluster.js?v=20261030d"></script>
-  <script src="assets/widgets/frontier.js?v=20261030d"></script>
-  <script src="assets/widgets/production.js?v=20261030d"></script>
+  <script src="assets/widgets/core.js?v=20261102c"></script>
+  <script src="assets/widgets/home.js?v=20261102c"></script>
+  <script src="assets/widgets/basics.js?v=20261102c"></script>
+  <script src="assets/widgets/serving.js?v=20261102c"></script>
+  <script src="assets/widgets/compression.js?v=20261102c"></script>
+  <script src="assets/widgets/kernels.js?v=20261102c"></script>
+  <script src="assets/widgets/cluster.js?v=20261102c"></script>
+  <script src="assets/widgets/frontier.js?v=20261102c"></script>
+  <script src="assets/widgets/production.js?v=20261102c"></script>
 
   <script src="assets/vendor/docsify.min.js"></script>
   <script src="assets/vendor/search.min.js"></script>

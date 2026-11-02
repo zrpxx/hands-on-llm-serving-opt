@@ -49,7 +49,7 @@ python code/stage4/moe_demo.py --experts 64 --topk 4 --ep 8
 dispatch + combine 的跨卡数据量（BF16）：7.0 MiB，是这一层输入激活（1.0 MiB）的 7.0 倍
 ```
 
-最后一行说明了 EP 的主要代价：每个 token 要发往 $k$ 个专家，dispatch 和 combine 加起来，跨卡的数据量是输入激活的约 $2k$ 倍。这比 TP 的 all-reduce 大得多，所以 EP 对网络的要求很高。
+最后一行说明了 EP 的主要代价：每个 token 要发往 $k$ 个专家，dispatch 和 combine 各传一次，扣除约 $1/\text{EP}$ 留在本卡的专家后，全集群跨卡传输的数据量是输入激活的 $2k \times \frac{\text{EP}-1}{\text{EP}}$ 倍（上例中 $2 \times 4 \times \frac{7}{8} = 7.0$ 倍；若同一个 token 选中的多个专家恰好落在同一张目标卡或同一个节点上，通信库还可以在发送端去重，只发送一份激活）。这比 TP 的 all-reduce 大得多，因此 EP 对网络带宽和延迟的要求很高。
 
 下面的组件可以观察真实模型在不同 EP 大小、不同专家热度下的负载：
 
@@ -64,7 +64,7 @@ MoE 模型中，注意力和专家适合不同的并行方式：
 
 于是每个 MoE 层的前后，token 在"按请求分布"和"按专家分布"之间来回转换，这正是 dispatch 和 combine 的作用。
 
-DeepSeek-V3 的技术报告给出了它的部署方式：prefill 阶段的最小部署单元是 4 台机器、32 张 H800，MoE 部分 EP = 32；decode 阶段是 40 台机器、320 张卡，MoE 部分 EP = 320，每张卡只放一个路由专家，另外用一部分卡放冗余的热门专家。prefill 和 decode 分开部署（4.3 节），各自选择最适合的并行方式。
+DeepSeek-V3 的技术报告给出了它的部署方式：prefill 阶段的最小部署单元是 4 台机器、32 张 H800，MoE 部分 EP = 32；decode 阶段是 40 台机器、320 张卡，MoE 部分 EP = 320，其中 256 张卡各放 1 个路由专家，其余 64 张卡存放冗余的热门路由专家与共享专家副本。prefill 和 decode 分开部署（4.3 节），各自选择最适合的并行方式。
 
 ## 5. 负载均衡
 

@@ -40,9 +40,10 @@
 
     function stepTime(tp) {
       const m = MD[st.model], g = GP[st.gpu], l = LINKS[st.link];
-      const P = W.modelParams(m).total;
+      const p = W.modelParams(m);
+      const P = p.total - p.emb;
       const tokens = 2 ** st.logTok;
-      const wBytes = (P * 2) / tp;
+      const wBytes = (p.total * 2) / tp;
       const bw = g.bw * 1e12 * 0.8, fl = g.bf16 * 1e12 * 0.6;
       const tLin = Math.max(wBytes / bw, (2 * P * tokens) / tp / fl);
       // 每层两次 all-reduce（注意力输出、FFN 输出），每次 [tokens, hidden] 的 BF16
@@ -259,7 +260,8 @@
       const m = MD[st.model], g = GP[st.gpu];
       const T = 2 ** st.logT;
       $('[data-tv]').textContent = `${T / 1024}K token`;
-      const P = W.modelParams(m).total;
+      const p = W.modelParams(m);
+      const P = p.total - p.emb;
       const fl = g.bf16 * 1e12 * 0.6;
       const recompute = (2 * P * T + 2 * m.L * m.nq * m.dh * T * T) / fl;   // 线性层 + 因果注意力
       const bytes = T * kvPerTok(m);

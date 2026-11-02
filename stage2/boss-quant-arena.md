@@ -1,6 +1,6 @@
 # 项目 2　Quant Arena：亲手实现主流量化方法
 
-> 前置：2.1～2.5 节。代码在 [`code/project2`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project2)。全部开发、测试和小模型上的对比实验都可以在 CPU 上完成，真实模型的精度与性能实验需要 GPU。
+> 前置：2.1～2.8 节。代码在 [`code/project2`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project2)。全部开发、测试和小模型上的对比实验都可以在 CPU 上完成，真实模型的精度与性能实验需要 GPU。
 
 读懂 GPTQ 的推导和把它写对是两回事。这个项目从最基本的量化、反量化函数开始，依次实现 FP8、GPTQ、AWQ、SmoothQuant 和 KV Cache 量化，然后把它们用到一个真实结构（Qwen3）的小模型上，在同一个测试集上比较困惑度。所有实现都是**伪量化**（fake quantization）：量化之后立刻反量化回浮点数，用来测量精度。性能则交给 vLLM 在 GPU 上测。
 
@@ -133,7 +133,7 @@ for i in range(块的宽度):
 <details>
 <summary>提示 3：为什么用上三角的 Cholesky 因子</summary>
 
-GPTQ 需要的是"量化了前 $i$ 列之后，剩余列的 $H^{-1}$"。2.2 节说明了，这些逐步更新的矩阵的第一行，恰好就是 $H^{-1}$ 的 Cholesky 上三角因子的对应行。所以循环里直接读 `Hinv1[i, i:]`，不需要在循环中更新任何矩阵。
+GPTQ 需要的是"量化了前 $i$ 列之后，剩余列的 $H^{-1}$"。2.2 节说明了，记 $H^{-1} = U^\top U$（代码中把这个上三角的 Cholesky 因子 $U$ 存放在变量 `Hinv` 中），消去前 $i$ 列后的逆矩阵第一行等于 $U_{i,i} \cdot U_{i, i:}$，对角元等于 $U_{i,i}^2$，相除后恰好约去一个 $U_{i,i}$，得到 `Hinv1[i, i:] / Hinv1[i, i]`。所以循环里直接按行读取 `Hinv1`，不需要在循环中更新任何逆矩阵。
 </details>
 
 测试检查 GPTQ 的输出误差比 RTN 小，并且每个量化后的值都落在它所在组的量化网格上。后者能发现一类常见的错误：把误差补偿加到了已经量化过的列上。

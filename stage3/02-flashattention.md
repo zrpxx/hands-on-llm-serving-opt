@@ -18,7 +18,7 @@ $$
 
 与此相比，注意力真正的输入输出只有 $Q$、$K$、$V$、$O$，一共 $4Nd$ 个数。$d = 128$ 时，只要 $N$ 超过几百，中间矩阵的读写量就远远超过了输入输出。注意力是被显存带宽卡住的，而且卡在本来不必要的读写上。
 
-原书把这个问题概括为：FlashAttention 的目标是避免在慢速的显存中生成大矩阵，把计算拆成小块放在片上的 SRAM 和寄存器里完成。难点在于 softmax：它要先知道一整行的最大值和指数和，才能算出任何一个元素的结果。如果按列分块，处理第一块时还不知道后面的块里有没有更大的值。
+FlashAttention 的核心目标是避免在显存中实例化 $N \times N$ 的中间矩阵，把计算拆成小块，留在片上的 SRAM 和寄存器里完成。难点在于 softmax：它要先知道一整行的最大值和指数和，才能算出任何一个元素的结果。如果按列分块，处理第一块时还不知道后面的块里有没有更大的值。
 
 ## 2. 在线 softmax
 
@@ -113,18 +113,18 @@ decode 还要处理分页的 KV Cache（1.3 节）：一个请求的 KV 分散�
 | FlashMLA | DeepSeek 为 MLA 开源的 decode kernel |
 | Triton | 用 Triton 写的实现，可移植性好，常用于 AMD 等平台 |
 
-原书给出了在 vLLM 中切换后端的方法：
+在 vLLM 中可以通过环境变量切换注意力后端：
 
 ```bash
 export VLLM_ATTENTION_BACKEND=FLASHINFER
 vllm serve Qwen/Qwen3-8B
 ```
 
-SGLang 使用 `--attention-backend` 参数。不同版本的可选值和默认值会变化，以启动日志中打印的实际后端为准。原书的建议是先使用默认的后端，把其他优化做完之后，再试验不同的 kernel。
+SGLang 使用 `--attention-backend` 参数。不同版本的可选值和默认值会变化，以启动日志中打印的实际后端为准。通常先使用默认后端，把其他优化做完之后，再对比不同的 kernel。
 
 ## 7. 实验
 
-项目 3 的第 3 步和第 4 步分别实现在线 softmax 和 FlashAttention 的前向，第 5 步实现分页的 decode 注意力。三者都可以在 CPU 上用 Triton 的解释器运行和测试：
+读完 3.3 节了解 Triton 的基本语法后，可以完成项目 3 的第 3～5 步：它们分别实现在线 softmax、FlashAttention 的前向和分页的 decode 注意力。在安装了 Triton 的环境中，三者都可以在 CPU 上用解释器运行和测试：
 
 ```bash
 cd code/project3

@@ -43,8 +43,8 @@ python code/stage6/batch_invariance.py
 Thinking Machines 的做法是逐个改写涉及归约的算子，**让每个元素的归约顺序与 batch 大小无关**：
 
 - **RMSNorm**：每一行由一个线程块完成归约，不论 batch 多大都用同样的策略。代价是 batch 很小时，线程块数少于 SM 数，GPU 用不满。
-- **矩阵乘法**：固定一种分块配置，不用 split-K。小 batch 时损失一部分性能，文章中的例子约慢 20%。
-- **注意力**：最复杂。decode 时常用 split-KV（把一条序列的 KV 切成几段并行计算，再合并），段数通常根据 batch 和序列长度决定。改为**固定每段的长度**而不是固定段数，每个位置的归约顺序就与 batch 无关了。另外，prefill 的分块和 decode 读 KV Cache 的方式要统一，保证同一个 token 无论在 prefill 中还是 decode 中计算，顺序都相同。
+- **矩阵乘法**：固定一种分块配置，不用随 batch 变化的动态 split-K（或者在固定的隐藏维度 $K$ 上始终分成固定段数，并用确定性的顺序合并部分和，避免无序的 `atomicAdd`）。小 batch 时损失一部分性能，文章中的例子约慢 20%。
+- **注意力**：最复杂。decode 时常用 split-KV（把一条序列的 KV 切成几段并行计算，再合并），段数通常根据 batch 和序列长度动态决定。由于不同请求、不同步骤的 KV 长度一直在变（不像矩阵乘法的 $K$ 是固定常数），split-KV 必须改为**固定每段的长度**（如每 256 个 token 一段）而不是固定段数，这样每个历史位置落入的段和归约顺序才与 batch 无关。另外，prefill 的分块和 decode 读 KV Cache 的方式要统一，保证同一个 token 无论在 prefill 中还是 decode 中计算，顺序都相同。
 
 性能代价：文章中用 Qwen3-8B 生成 1000 条序列，vLLM 默认用时 26 秒，未优化的确定性版本 55 秒，改进注意力 kernel 后为 42 秒。
 

@@ -67,25 +67,25 @@ class Scheduler:
 
     # ---------- 块管理 ----------
     def _blocks_needed(self, seq: Sequence, num_new: int) -> int:
-        # TODO(1-3)：
+        # TODO(第 2 步)：
         # 该请求在已计算 num_computed_tokens 的基础上再处理 num_new 个 token，还需要新分配几个块。
         # 分步指南第 2 步，测试：pytest tests/test_steps.py -k step02
-        raise NotImplementedError("TODO(1-3): Scheduler._blocks_needed")
+        raise NotImplementedError("TODO(第 2 步): Scheduler._blocks_needed")
 
     def _can_allocate(self, seq: Sequence, num_new: int) -> bool:
         return self._blocks_needed(seq, num_new) <= self.allocator.num_free
 
     def _allocate(self, seq: Sequence, num_new: int):
-        # TODO(1-3)：
+        # TODO(第 2 步)：
         # 按 _blocks_needed 的数量分配块，追加到 seq.block_table。
         # 分步指南第 2 步，测试：pytest tests/test_steps.py -k step02
-        raise NotImplementedError("TODO(1-3): Scheduler._allocate")
+        raise NotImplementedError("TODO(第 2 步): Scheduler._allocate")
 
     def _preempt(self, seq: Sequence):
-        # TODO(1-3)：
+        # TODO(第 6 步)：
         # 抢占：释放全部块、清零 num_computed_tokens、状态改回 WAITING、放回等待队列头部，并更新计数。
         # 分步指南第 6 步，测试：pytest tests/test_steps.py -k step06
-        raise NotImplementedError("TODO(1-3): Scheduler._preempt")
+        raise NotImplementedError("TODO(第 6 步): Scheduler._preempt")
 
     # ---------- 主入口 ----------
     def schedule(self) -> SchedulerOutput:
@@ -95,27 +95,27 @@ class Scheduler:
             return self._schedule_no_chunk()
         return self._schedule_continuous()
 
-    def _schedule_running(self, budget: int, max_tokens_per_seq=None):
+    def _schedule_running(self, budget: int):
         """给 RUNNING 请求分配 token；显存不足时从队尾抢占。返回 (scheduled, 剩余预算, 抢占数)。"""
-        # TODO(1-2 / 1-3)：
+        # TODO(第 4、6 步)：
         # 按顺序给 RUNNING 请求分配 token（decode 为 1 个，未完成的 prefill 为剩余部分，受预算限制）；
         # 块不够时从队尾抢占，直到够用或轮到自己被抢占。返回 (scheduled, 剩余预算, 抢占数)。
         # 分步指南第 4 步（先不含抢占）和第 6 步，测试：-k step04、-k step06
-        raise NotImplementedError("TODO(1-2 / 1-3): Scheduler._schedule_running")
+        raise NotImplementedError("TODO(第 4、6 步): Scheduler._schedule_running")
 
     def _admit(self, budget: int, allow_partial: bool):
         """从 WAITING 队首依次接纳请求。"""
-        # TODO(1-2)：
+        # TODO(第 3 步)：
         # 从 WAITING 队首依次接纳请求，直到达到 max_num_seqs、预算耗尽或块不够。
         # allow_partial=True 时允许只处理 prompt 的一部分（chunked prefill）。
         # 分步指南第 3 步，测试：pytest tests/test_steps.py -k step03
-        raise NotImplementedError("TODO(1-2): Scheduler._admit")
+        raise NotImplementedError("TODO(第 3 步): Scheduler._admit")
 
     def _schedule_continuous(self) -> SchedulerOutput:
-        # TODO(1-2)：
+        # TODO(第 5 步)：
         # 先调度 RUNNING，再用剩余预算接纳 WAITING；本步发生过抢占时不接纳新请求。
         # 分步指南第 5 步，测试：pytest tests/test_steps.py -k step05
-        raise NotImplementedError("TODO(1-2): Scheduler._schedule_continuous")
+        raise NotImplementedError("TODO(第 5 步): Scheduler._schedule_continuous")
 
     def _schedule_no_chunk(self) -> SchedulerOutput:
         admitted = self._admit(self.max_num_batched_tokens, allow_partial=False)

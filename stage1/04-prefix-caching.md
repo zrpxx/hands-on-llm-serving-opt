@@ -22,13 +22,13 @@
 
 看三个 prompt：
 
-1. `Hi, what is the weather like today?`
-2. `Hi, what is the weather like now?`
+1. `Hi! What is the weather like today?`
+2. `Hi! What is the weather like now?`
 3. `What is the weather like today?`
 
-prompt 2 可以复用 prompt 1 中 `Hi, what is the weather like` 这一段的 KV Cache。prompt 3 后面的整句话都和 prompt 1 相同，却一个 token 也不能复用。原因有两个：
+prompt 2 可以复用 prompt 1 中 `Hi! What is the weather like` 这一段的 KV Cache。prompt 3 后面的整句话都和 prompt 1 相同，却一个 token 也不能复用。原因有两个：
 
-- **上文不同。** prompt 1 中的 `weather` 在注意力里看到了开头的 `Hi,`，prompt 3 中的没有看到。从第二层开始，它们的隐藏状态就不同了，K、V 自然也不同。
+- **上文不同。** prompt 1 中的 `weather` 在注意力里看到了开头的 `Hi!`，prompt 3 中的没有看到。从第二层开始，它们的隐藏状态就不同了，K、V 自然也不同。
 - **位置不同。** prompt 1 中的 `What` 在位置 2，prompt 3 中的在位置 0。RoPE 按位置旋转 K，即使是第一层，K 也不一样。
 
 所以前缀缓存必须从第 0 个 token 开始逐个匹配。一旦在位置 $i$ 出现不同，从 $i$ 往后的部分都不能复用，即使后面的文本完全一样。

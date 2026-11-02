@@ -10,7 +10,7 @@ KV Cache 用 BF16，专家权重用 FP8。硬件取 H800。只估算单层的主
 """
 import argparse
 
-BW, FLOPS = 3.35e12, 1979e12        # H800：HBM 带宽、FP8 稠密算力
+BW, FLOPS_BF16, FLOPS_FP8 = 3.35e12, 989e12, 1979e12   # H800：HBM 带宽、BF16 与 FP8 稠密算力
 
 MODELS = {
     "Qwen3-235B-A22B": dict(kv_bytes=2 * 4 * 128 * 2, attn_flops=4 * 64 * 128, n_exp=128, topk=8, exp_params=3 * 4096 * 1536),
@@ -19,19 +19,19 @@ MODELS = {
 
 
 def attn(m, batch, ctx):
-    """每个请求读自己的 KV。返回（耗时，算术强度）。"""
+    """每个请求读自己的 KV（BF16）。返回（耗时，算术强度）。"""
     by = batch * ctx * m["kv_bytes"]
     fl = batch * ctx * m["attn_flops"]
-    return max(by / BW, fl / FLOPS), fl / by
+    return max(by / BW, fl / FLOPS_BF16), fl / by
 
 
 def moe(m, tokens, n_gpu):
-    """tokens 个 token 经过 MoE，专家平均分到 n_gpu 张卡，负载完全均衡。返回（耗时，算术强度）。"""
+    """tokens 个 token 经过 MoE（FP8 权重），专家平均分到 n_gpu 张卡，负载完全均衡。返回（耗时，算术强度）。"""
     exp_per_gpu = m["n_exp"] / n_gpu
     tok_per_exp = tokens * m["topk"] / m["n_exp"]
     by = exp_per_gpu * m["exp_params"]
     fl = exp_per_gpu * tok_per_exp * 2 * m["exp_params"]
-    return max(by / BW, fl / FLOPS), fl / by
+    return max(by / BW, fl / FLOPS_FP8), fl / by
 
 
 def main():
@@ -39,7 +39,7 @@ def main():
     ap.add_argument("--ctx", type=int, default=4096, help="平均上下文长度")
     ap.add_argument("--ep", type=int, default=32, help="专家并行的卡数")
     args = ap.parse_args()
-    print(f"上下文 {args.ctx} token，EP = {args.ep}；H800 的平衡点约 {FLOPS / BW:.0f} FLOP/字节\n")
+    print(f"上下文 {args.ctx} token，EP = {args.ep}；H800 的平衡点：BF16 约 {FLOPS_BF16 / BW:.0f}、FP8 约 {FLOPS_FP8 / BW:.0f} FLOP/字节\n")
     for name, m in MODELS.items():
         print(name)
         print(f"{'每卡 batch':>10s}{'Attention 强度':>16s}{'MoE 强度':>10s}{'Attention':>12s}{'MoE':>10s}")

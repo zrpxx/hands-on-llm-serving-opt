@@ -95,14 +95,12 @@ class Scheduler:
             return self._schedule_no_chunk()
         return self._schedule_continuous()
 
-    def _schedule_running(self, budget: int, max_tokens_per_seq=None):
+    def _schedule_running(self, budget: int):
         """给 RUNNING 请求分配 token；显存不足时从队尾抢占。返回 (scheduled, 剩余预算, 抢占数)。"""
         scheduled, preempted, i = [], 0, 0
         while i < len(self.running) and budget > 0:
             seq = self.running[i]
             n = min(seq.num_tokens - seq.num_computed_tokens, budget)
-            if max_tokens_per_seq is not None:
-                n = min(n, max_tokens_per_seq)
             while not self._can_allocate(seq, n):
                 victim = self.running[-1]
                 self._preempt(victim)

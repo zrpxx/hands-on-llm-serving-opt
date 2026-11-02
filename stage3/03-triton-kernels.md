@@ -86,13 +86,21 @@ def _rmsnorm_kernel(x_ptr, w_ptr, out_ptr, D, eps, BLOCK: tl.constexpr):
 
 ## 4. 矩阵乘法与自动调优
 
-Triton 也能写出接近 cuBLAS 性能的矩阵乘法。思路和 FlashAttention 一样：每个 program 负责输出矩阵的一个 $[B_M, B_N]$ 块，沿求和维度每次读入 $A$ 的 $[B_M, B_K]$ 块和 $B$ 的 $[B_K, B_N]$ 块，用 `tl.dot` 累加：
+Triton 也能写出接近 cuBLAS 性能的矩阵乘法。思路和 FlashAttention 一样：每个 program 负责输出矩阵的一个 $[B_M, B_N]$ 块，沿求和维度每次读入 $A$ 的 $[B_M, B_K]$ 块和 $B$ 的 $[B_K, B_N]$ 块，用 `tl.dot` 累加。
+
+处理二维块时，常用 `[:, None]`（列向量）和 `[None, :]`（行向量）的广播来一次构造二维指针块和二维掩码，项目 3 的第 4、5 步也会反复用到这种写法：
 
 ```python
+offs_m = pid_m * BM + tl.arange(0, BM)               # [BM]
+offs_n = pid_n * BN + tl.arange(0, BN)               # [BN]
+offs_k = tl.arange(0, BK)                            # [BK]
+a_ptrs = a_ptr + offs_m[:, None] * stride_am + offs_k[None, :] * stride_ak   # [BM, BK]
+b_ptrs = b_ptr + offs_k[:, None] * stride_bk + offs_n[None, :] * stride_bn   # [BK, BN]
+
 acc = tl.zeros((BM, BN), dtype=tl.float32)
 for k in range(0, K, BK):
-    a = tl.load(a_ptrs, mask=..., other=0.0)
-    b = tl.load(b_ptrs, mask=..., other=0.0)
+    a = tl.load(a_ptrs, mask=(offs_m[:, None] < M) & (k + offs_k[None, :] < K), other=0.0)
+    b = tl.load(b_ptrs, mask=(k + offs_k[:, None] < K) & (offs_n[None, :] < N), other=0.0)
     acc += tl.dot(a, b)
     a_ptrs += BK * stride_ak
     b_ptrs += BK * stride_bk

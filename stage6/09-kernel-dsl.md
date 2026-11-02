@@ -8,10 +8,10 @@
 
 Hopper 和 Blackwell 引入了一系列新的硬件机制：
 
-- **TMA**（Tensor Memory Accelerator）：用一条指令在全局内存和共享内存之间搬运一整块数据，异步完成；
-- **WGMMA / tcgen05**：以 warpgroup 为单位的异步矩阵乘法，Blackwell 还加入了专门的 Tensor Memory；
-- **warp 专门化**：一部分 warp 只负责搬数据，一部分只负责计算，通过屏障同步；
-- **线程块簇**（cluster）：相邻的线程块可以访问彼此的共享内存。
+- **TMA**（Tensor Memory Accelerator）：用一条指令在全局内存和共享内存之间搬运一整块多维张量数据，由硬件异步完成地址计算与传输；
+- **WGMMA / tcgen05**：Hopper 的 `wgmma` 以 warpgroup（4 个 warp 共 128 个线程）为单位发起异步矩阵乘法，累加器放在寄存器中；Blackwell 的第 5 代 Tensor Core 指令 `tcgen05` 则可由单个 warp 发起，并将累加器放在专门的片上 **Tensor Memory（TMEM）** 中，不再挤占线程寄存器；
+- **warp 专门化**：一部分 warp 只负责用 TMA 搬数据（生产者），另一部分 warp 只负责发射矩阵乘与逐元素计算（消费者），通过硬件屏障同步；
+- **线程块簇**（cluster）：相邻的线程块可以组成簇，直接访问彼此的共享内存或协同发起多播搬运。
 
 要发挥这些硬件的性能，kernel 需要显式地组织数据搬运、计算和同步的流水线。Triton 的抽象层级较高，编译器替你做了很多决定，在新硬件上往往要等编译器支持，而且难以精细控制。CUDA C++ 能控制一切，但代码冗长，模板错误难以调试，编译很慢。新的 DSL 试图在二者之间找到平衡。
 
@@ -67,7 +67,25 @@ def matmul(M, N, K, block_M=128, block_N=128, block_K=32, dtype="float16", accum
 
 CuTe 是 CUTLASS 3 中描述张量布局的核心抽象：用"形状 + 步长"表示数据在内存中的排布，以及线程与数据之间的映射。CUTLASS 4（2025 年）推出了 CuTe 的 Python 版本，即 CuTe DSL。它保留了 C++ 版本的全部控制力，直接暴露 TMA、WGMMA、tcgen05 等硬件特性，但编译时间从几分钟缩短到几秒，也能在 Python 中调试。
 
-FlashAttention-4 针对 Blackwell，全部用 CuTe DSL 编写。它的抽象层级比 TileLang 更低，写起来更接近 CUDA，适合追求极致性能、需要精确控制每一个硬件细节的 kernel。
+FlashAttention-4 针对 Blackwell，全部用 CuTe DSL 编写。它的核心是用 `Layout = Shape : Stride` 描述每一级内存与线程的分工：
+
+```python
+import cutlass.cute as cute
+
+@cute.kernel
+def gemm_kernel(gA: cute.Tensor, gB: cute.Tensor, gC: cute.Tensor, mma: cute.TiledMma):
+    tidx, _, _ = cute.arch.thread_idx()
+    bidx, bidy, _ = cute.arch.block_idx()
+    # 按 (Shape, Stride) 切出当前线程块负责的全局内存 tile，以及共享内存缓冲
+    sA = cute.make_tensor(cute.alloc_smem(gA.dtype, (128, 64)), cute.make_layout((128, 64)))
+    sB = cute.make_tensor(cute.alloc_smem(gB.dtype, (64, 128)), cute.make_layout((64, 128)))
+    thr_mma = mma.get_slice(tidx)
+    tCrC = thr_mma.partition_fragment_C(gC[(None, None, bidx, bidy)])
+    cute.clear(tCrC)
+    # 显式调度 TMA 异步拷贝、屏障等待与 WGMMA / tcgen05 指令
+```
+
+它的抽象层级比 TileLang 更低，写起来更接近 CUDA 与 CUTLASS C++，适合追求极致性能、需要精确控制每一个硬件细节的 kernel。
 
 ## 5. 怎样选择
 

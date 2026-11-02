@@ -87,13 +87,14 @@ class Instance:
             if getattr(req, "_decode_ready", False):
                 break
             keys = req.block_keys()
-            hit = self.cache.match(keys) * BLOCK if self.cache is not None else 0
+            hit = self.cached_prefix_tokens(req) if self.cache is not None else 0
             hit = min(hit, req.input_len - 1)                   # 至少算最后一个 token，才能得到 logits
             need_kv = req.input_len - hit + (req.output_len if self.role != "prefill" else 0)
             if self.kv_used + need_kv > self.kv_capacity:
                 break
             self.waiting.pop(0)
             if self.cache is not None:
+                self.cache.match(keys)
                 self.cache.acquire(keys)
             req.cached_tokens = hit
             self.kv_used += need_kv

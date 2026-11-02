@@ -59,7 +59,7 @@
 * **第 5 部分　实践与前沿**
   * [5.1 端到端优化流程](final/01-optimization-playbook.md)
   * [5.2 优化权衡](final/02-tradeoffs.md)
-  * [5.3 语义缓存](final/03-semantic-caching.md)
+  * [5.3 语义缓存与语义路由](final/03-semantic-caching.md)
   * [5.4 多模态 Serving](final/04-multimodal-serving.md)
   * [5.5 端侧推理](final/05-edge-ai.md)
   * [5.6 强化学习中的推理服务](final/06-rl-serving.md)

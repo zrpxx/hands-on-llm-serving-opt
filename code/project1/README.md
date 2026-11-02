@@ -6,7 +6,7 @@
 
 | 路径 | 内容 |
 |---|---|
-| `starter/miniserve/` | 待完成的骨架，关键函数标有 `TODO(1-x)` |
+| `starter/miniserve/` | 待完成的骨架，关键函数标有 `TODO(第 x 步)` |
 | `solution/miniserve/` | 参考实现。建议自己完成后再对照 |
 | `baseline_hf.py` | Hugging Face 逐个处理请求的基线，用于对比 |
 | `bench.py` | 压测客户端，适用于任意 OpenAI 兼容服务 |

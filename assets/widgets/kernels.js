@@ -213,7 +213,7 @@
           <div class="lw-stat"><div class="lw-stat-label">不融合的实现，读写量</div><div class="lw-stat-value">${fmtBytes(naive)}</div><div class="lw-stat-sub">S 与 P 被读写约 8 遍</div></div>
           <div class="lw-stat info"><div class="lw-stat-label">FlashAttention，读写量</div><div class="lw-stat-value">${fmtBytes(flash)}</div><div class="lw-stat-sub">上限：K、V 每个查询块读一遍</div></div>
         </div>
-        <div class="lw-callout">FlashAttention 的额外显存只有 O(N)，不随 N² 增长。它对 K、V 的重复读取有很大一部分会命中 L2 缓存，实际的显存流量比这里的上限还小。</div>        </div>`;
+        <div class="lw-callout">FlashAttention 的额外显存只有 O(N)，不随 N² 增长。它对 K、V 的重复读取有很大一部分会命中 L2 缓存，实际的显存流量比这里的上限还小。</div>`;
     }
 
     $('[data-next]').addEventListener('click', () => { st.step++; update(); });
@@ -560,7 +560,7 @@
         </div>
         <div class="lw-callout">${st.graph
           ? 'CUDA Graph 把整步的 kernel 录制下来，之后一次调用重放，CPU 的开销只剩一次发射，kernel 之间几乎没有空隙。代价是输入的形状必须固定，所以 vLLM 会为若干种 batch 大小分别录制。'
-          : util < 0.6 ? 'GPU 一大半时间在等 CPU 发射下一个 kernel。这就是原书说的"GPU 利用率看起来不低，kernel 之间却有大量空隙"。模型越小、GPU 越快，这个问题越严重。'
+          : util < 0.6 ? 'GPU 一大半时间在等 CPU 发射下一个 kernel。这就是前面提到的"GPU 利用率看起来不低，kernel 之间却有大量空隙"。模型越小、GPU 越快，这个问题越严重。'
           : '模型足够大时，每个 kernel 的 GPU 耗时超过了发射开销，CPU 能跑在 GPU 前面，空隙就消失了。'}</div>`;
     }
 

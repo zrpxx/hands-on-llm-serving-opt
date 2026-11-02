@@ -49,11 +49,11 @@ def paged_decode_attention(q, k_cache, v_cache, block_tables, seq_lens, sm_scale
     block_tables: [B, max_blocks] int32；seq_lens: [B] int32。返回 [B, H, D]。"""
     B, H, D = q.shape
     _, block_size, Hkv, _ = k_cache.shape
-    o = torch.empty(B, H, D, dtype=torch.float32, device=q.device)
+    o = torch.empty_like(q)
     sm_scale = sm_scale or 1.0 / math.sqrt(D)
     _paged_decode_kernel[(B, H)](q.contiguous(), k_cache, v_cache, block_tables.contiguous(), seq_lens, o,
                                  sm_scale, block_tables.shape[1], H=H, HKV=Hkv, D=D, BLOCK_SIZE=block_size)
-    return o.to(q.dtype)
+    return o
 
 
 def paged_decode_ref(q, k_cache, v_cache, block_tables, seq_lens, sm_scale=None):
