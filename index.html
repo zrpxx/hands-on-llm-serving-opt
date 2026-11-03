@@ -20,7 +20,7 @@
   <!-- 所有依赖都托管在仓库内（assets/vendor），不依赖外部 CDN 与网络字体 -->
   <link rel="stylesheet" href="assets/vendor/docsify-vue.css" />
   <link rel="stylesheet" href="assets/vendor/katex/katex.min.css" />
-  <link rel="stylesheet" href="assets/custom.css?v=20261103b" />
+  <link rel="stylesheet" href="assets/custom.css?v=20261103c" />
 </head>
 <body>
   <div class="reading-progress" aria-hidden="true"><div class="reading-progress-bar" id="reading-progress-bar"></div></div>
@@ -136,8 +136,8 @@
           });
         },
 
-        // Mermaid 与交互组件
-        function (hook) {
+        // Mermaid、交互组件与术语提示
+        function (hook, vm) {
           hook.doneEach(function () {
             if (window.mermaid) {
               try { window.mermaid.run({ querySelector: '.markdown-section .mermaid' }); } catch (e) {}
@@ -146,6 +146,11 @@
               window.LLMWidgets.mountAll();
               var sec = document.querySelector('.markdown-section');
               if (sec && window.LLMWidgets.renderMath) window.LLMWidgets.renderMath(sec);
+            }
+            // 术语提示：主页和附录不加
+            var route = (vm.route.path || '').replace(/^\//, '');
+            if (window.LLMTerms && route && route !== 'README' && route.indexOf('appendix/') !== 0) {
+              window.LLMTerms.apply(document.querySelector('.markdown-section'), route);
             }
           });
         },
@@ -287,15 +292,16 @@
     };
   </script>
 
-  <script src="assets/widgets/core.js?v=20261103b"></script>
-  <script src="assets/widgets/home.js?v=20261103b"></script>
-  <script src="assets/widgets/basics.js?v=20261103b"></script>
-  <script src="assets/widgets/serving.js?v=20261103b"></script>
-  <script src="assets/widgets/compression.js?v=20261103b"></script>
-  <script src="assets/widgets/kernels.js?v=20261103b"></script>
-  <script src="assets/widgets/cluster.js?v=20261103b"></script>
-  <script src="assets/widgets/frontier.js?v=20261103b"></script>
-  <script src="assets/widgets/production.js?v=20261103b"></script>
+  <script src="assets/terms.js?v=20261103c"></script>
+  <script src="assets/widgets/core.js?v=20261103c"></script>
+  <script src="assets/widgets/home.js?v=20261103c"></script>
+  <script src="assets/widgets/basics.js?v=20261103c"></script>
+  <script src="assets/widgets/serving.js?v=20261103c"></script>
+  <script src="assets/widgets/compression.js?v=20261103c"></script>
+  <script src="assets/widgets/kernels.js?v=20261103c"></script>
+  <script src="assets/widgets/cluster.js?v=20261103c"></script>
+  <script src="assets/widgets/frontier.js?v=20261103c"></script>
+  <script src="assets/widgets/production.js?v=20261103c"></script>
 
   <script src="assets/vendor/docsify.min.js"></script>
   <script src="assets/vendor/search.min.js"></script>

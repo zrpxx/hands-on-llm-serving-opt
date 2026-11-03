@@ -121,6 +121,7 @@
       <li><strong>一张 24～80 GB 的显卡</strong>：vLLM、SGLang 对照实验，真实模型的量化评测，Triton 算子的性能测试。按小时租用云 GPU 即可。</li>
       <li><strong>两个 Triton</strong>：原书中的 Triton 多指 NVIDIA Triton Inference Server，一个服务框架；第 3 部分写算子用的是 OpenAI 的 Triton 语言，两者无关。</li>
       <li><strong>书外内容</strong>：标注「书外」的章节和段落，依据论文、框架源码和官方文档整理。</li>
+      <li><strong>术语提示</strong>：正文中带虚线下划线的术语，悬停或点按会显示一句话解释，并链接到讲解它的章节或维基百科；完整列表见<a href="#/appendix/glossary">术语表</a>。</li>
     </ul>
   </div>
   <div class="home-bottom-col">

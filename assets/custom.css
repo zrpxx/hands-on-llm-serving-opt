@@ -1316,3 +1316,35 @@ body.is-home .markdown-section h2 { border-bottom: 0; padding-bottom: 0; }
 .markdown-section .lw-table-wrap table.lw-table { display: table; width: 100%; max-width: none; font-size: 0.84rem; margin: 0; }
 .lw-table td, .lw-table th { white-space: nowrap; }
 .lw-table tr.lw-row-hi td { background: var(--prefill-soft); font-weight: 600; }
+
+/* =========================================================================
+   术语提示
+   ========================================================================= */
+.markdown-section .term {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--ink-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: help;
+  border-radius: 2px;
+}
+.markdown-section .term:hover,
+.markdown-section .term:focus-visible { text-decoration-color: var(--prefill); color: var(--prefill-ink); outline: none; }
+.term-pop {
+  position: absolute;
+  z-index: 80;
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(16, 22, 32, 0.14);
+  padding: 10px 14px 11px;
+  font: 400 0.84rem/1.68 var(--font-body);
+}
+.term-pop[hidden] { display: none; }
+.term-pop-name { font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.term-pop-def { color: var(--ink-2); }
+.term-pop-links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); font-size: 0.8rem; }
+.term-pop-links a { color: var(--prefill) !important; font-weight: 600; text-decoration: none; }
+.term-pop-links a:hover { text-decoration: underline; }
+@media print { .markdown-section .term { text-decoration: none; } .term-pop { display: none !important; } }
