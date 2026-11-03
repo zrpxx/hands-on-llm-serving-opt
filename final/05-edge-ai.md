@@ -51,18 +51,18 @@ python code/stage5/cpu_decode_speed.py --hidden 2048 --layers 16
 
 ### 3.1 压缩
 
-原书说，云端使用压缩主要是为了提高吞吐、维持延迟，而在端侧，压缩常常是**能不能运行的前提**：不压缩，模型根本放不进设备的内存或存储。第 2 部分的量化、剪枝、蒸馏在端侧都很重要；KV Cache、投机解码、kernel 优化这些推理优化同样适用。
+云端做压缩，主要是为了提高吞吐、守住延迟；端侧做压缩，常常是**能不能运行的前提**：不压缩，模型根本放不进设备的内存或存储。第 2 部分的量化、剪枝、蒸馏在端侧都很重要；KV Cache、投机解码、kernel 优化这些推理优化同样适用。
 
 ### 3.2 运行时
 
-原书第 1 章介绍了端侧应用的两个关键组件：
+端侧应用有两个关键组件（原书第 1 章）：
 
-- **模型运行时**：在不同的硬件和操作系统上高效执行模型的软件框架，提供针对硬件的优化，并通过 delegate 把计算密集的部分从 CPU 卸载到 GPU 或 NPU。原书提到的有 LiteRT（原 TensorFlow Lite）、ONNX Runtime、Core ML。
+- **模型运行时**：在不同的硬件和操作系统上高效执行模型的软件框架，提供针对硬件的优化，并通过 delegate 把计算密集的部分从 CPU 卸载到 GPU 或 NPU。常见的有 LiteRT（原 TensorFlow Lite）、ONNX Runtime、Core ML。
 - **模型封装**：应用开发者写的一层，负责预处理输入、调用运行时、后处理输出，让应用逻辑不必关心模型执行的细节。
 
 部署流程大致是：把训练好的模型转换成运行时需要的格式（比如用 `ai_edge_torch.convert` 转成 LiteRT 的 `.tflite`），在目标设备上验证数值精度（用同样的输入在服务器和设备上运行，比较输出），测量性能，最后随应用一起发布。
 
-对 LLM 来说，最常用的是 **llama.cpp**（原书第 8 章）。它是一个精简的 C/C++ 推理栈，模型使用 GGUF 格式，支持 2 到 8 位的多种量化，能在 CPU、Apple Silicon、各种 GPU 上运行，自带兼容 OpenAI 接口的 HTTP 服务。原书的结论是：需要本地、私有部署或者端侧部署，追求小的资源占用和低成本时，用 llama.cpp。Ollama 在 llama.cpp 之上提供了更方便的模型管理和使用体验。Apple 设备上还可以用 MLX。
+对 LLM 来说，最常用的是 **llama.cpp**（原书第 8 章）。它是一个精简的 C/C++ 推理栈，模型使用 GGUF 格式，支持 2 到 8 位的多种量化，能在 CPU、Apple Silicon、各种 GPU 上运行，自带兼容 OpenAI 接口的 HTTP 服务。需要本地、私有部署或端侧部署，追求资源占用小、成本低时，llama.cpp 是首选。Ollama 在 llama.cpp 之上提供了更方便的模型管理和使用体验。Apple 设备上还可以用 MLX。
 
 > [!NOTE]
 > 原书说要通过 REST 接口使用 llama.cpp 可以用 Ollama。llama.cpp 自带的 `llama-server` 本身就提供兼容 OpenAI 的 HTTP 接口，原书在同一章也提到了这一点；Ollama 的价值主要在于模型的下载、管理和更简单的使用方式。

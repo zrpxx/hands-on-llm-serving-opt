@@ -68,7 +68,7 @@ SparseGPT 更进一步，和 GPTQ 一样利用 $H = 2XX^\top$ 的信息，在剪
 
 在 Llama-2-7B 上，Wanda 的作者报告的 WikiText 困惑度是：原模型 5.12；2:4 稀疏时，按权重大小剪枝 54.59，SparseGPT 10.17，Wanda 11.02。一次性剪掉一半权重后，即使最好的方法，困惑度也接近翻倍。所以实用的 2:4 模型都需要在剪枝之后继续训练。
 
-原书提到的 Sparse Llama 3.1 8B 就是这样做的：Neural Magic 先用 SparseGPT 剪成 2:4，再用大量数据继续训练。他们报告的结果是在 Open LLM Leaderboard v1 上恢复了 98% 的精度，在 vLLM 中仅靠稀疏就带来最多 30% 的吞吐提升和 1.8 倍的延迟降低；再结合 4 位量化和 Sparse-Marlin kernel，加速 1.4 到 4.9 倍。
+Sparse Llama 3.1 8B 就是这样做的：Neural Magic 先用 SparseGPT 剪成 2:4，再用大量数据继续训练。他们报告的结果是在 Open LLM Leaderboard v1 上恢复了 98% 的精度，在 vLLM 中仅靠稀疏就带来最多 30% 的吞吐提升和 1.8 倍的延迟降低；再结合 4 位量化和 Sparse-Marlin kernel，加速 1.4 到 4.9 倍。
 
 > [!NOTE]
 > 原书把 Sparse Llama 的延迟收益写成"降低 20%"，与 Neural Magic 公布的"1.8 倍"不一致。另外，原书说 50% 的稀疏"可以直接让矩阵乘法的速度翻倍"，这是 Tensor Core 的理论峰值。实际的端到端收益小得多：decode 时瓶颈是带宽，2:4 只省下约 44% 的权重字节（见组件中的存储计算）；注意力、通信等部分也不受影响。
@@ -113,7 +113,7 @@ python tools/prune_24.py --model /tmp/tiny-lm --data data
 ## 延伸阅读
 
 - Hinton et al., [Distilling the Knowledge in a Neural Network](https://arxiv.org/abs/1503.02531), 2015。
-- DeepSeek-AI, [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://arxiv.org/abs/2501.12948), 2025，第 [2.4 节](stage2/04-activation-quant.md)蒸馏。
+- DeepSeek-AI, [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://arxiv.org/abs/2501.12948), 2025，第 2.4 节蒸馏。
 - Frantar & Alistarh, [SparseGPT: Massive Language Models Can Be Accurately Pruned in One-Shot](https://arxiv.org/abs/2301.00774), ICML 2023。
 - Sun et al., [A Simple and Effective Pruning Approach for Large Language Models](https://arxiv.org/abs/2306.11695)（Wanda），ICLR 2024。
 - Muralidharan et al., [Compact Language Models via Pruning and Knowledge Distillation](https://arxiv.org/abs/2407.14679)（Minitron），NeurIPS 2024。

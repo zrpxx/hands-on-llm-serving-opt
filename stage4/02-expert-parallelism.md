@@ -27,7 +27,7 @@ DeepSeek-V3 的每个 token 只用 370 亿参数计算，计算量与一个 37B 
 
 ## 3. 专家并行
 
-原书的描述是：专家并行（EP）把专家分到多张卡上，每个 token 只发往它所选专家所在的卡，避免在不需要的专家上浪费计算。它通常与 TP、PP 配合使用。
+专家并行（EP）把专家分到多张卡上，每个 token 只发往它所选专家所在的卡，不在用不到的专家上浪费计算。它通常与 TP、PP 配合使用。
 
 一个 MoE 层在 EP 下的执行分为四步：
 
@@ -68,7 +68,7 @@ DeepSeek-V3 的技术报告给出了它的部署方式：prefill 阶段的最小
 
 ## 5. 负载均衡
 
-EP 下，一个 MoE 层的耗时由最忙的那张卡决定。负载不均的原因有两个：专家本身的热度不同，以及同一批 token 碰巧集中选了某几个专家。处理的办法有：
+EP 下，一个 MoE 层的耗时由最忙的那张卡决定。负载不均的原因有两个：专家本身的热度不同，以及同一批 token 碰巧集中选了某几个专家。处理办法有三类：
 
 - **训练时的均衡**。训练时加入辅助损失，或者像 DeepSeek-V3 那样给每个专家一个可调的偏置，让各专家被选中的频率接近。
 - **冗余专家与重新分配**。统计各专家的负载，把热门专家复制几份放到不同的卡上，并重新安排专家的位置，让每张卡的总负载接近。DeepSeek 开源了这个算法（EPLB），[6.3 节](stage6/03-wide-ep-eplb.md)会详细讨论。
@@ -84,7 +84,7 @@ vllm serve Qwen/Qwen3-30B-A3B --data-parallel-size 8 --enable-expert-parallel
 python -m sglang.launch_server --model-path Qwen/Qwen3-30B-A3B --tp 8 --dp 8 --enable-dp-attention
 ```
 
-vLLM 中，MoE 层的 EP 大小等于 TP 与 DP 的乘积。不加 `--enable-expert-parallel` 时，MoE 层的专家也按 TP 的方式切开。具体的参数名和可选的 all-to-all 后端在各版本之间有变化，以所用版本的文档为准。
+vLLM 中，MoE 层的 EP 大小等于 TP 与 DP 的乘积。不加 `--enable-expert-parallel` 时，MoE 层的专家也按 TP 的方式切开。具体的参数名和可选的 all-to-all 后端在不同版本间有变化，使用前查对应版本的文档。
 
 ## 7. 实验
 
@@ -98,7 +98,7 @@ vLLM 中，MoE 层的 EP 大小等于 TP 与 DP 的乘积。不加 `--enable-exp
 
 ## 延伸阅读
 
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.1.2 节（DeepSeekMoE 与无辅助损失的负载均衡）和第 [3.4 节](stage3/04-speculative-decoding.md)（推理部署）。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.1.2 节（DeepSeekMoE 与无辅助损失的负载均衡）和第 3.4 节（推理部署）。
 - [DeepEP](https://github.com/deepseek-ai/DeepEP) 与 [EPLB](https://github.com/deepseek-ai/EPLB)。
 - Grootendorst, [A Visual Guide to Mixture of Experts](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts), 2024。原书推荐的 MoE 入门读物。
 - [vLLM 文档：Expert Parallel Deployment](https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment.html)。

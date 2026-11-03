@@ -142,6 +142,6 @@ FORGE_IMPL=solution python spec_demo.py --target /tmp/tiny-lm --draft /tmp/draft
 
 - Cai et al., [Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads](https://arxiv.org/abs/2401.10774), ICML 2024。
 - Li et al., [EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty](https://arxiv.org/abs/2401.15077), ICML 2024；[EAGLE-2](https://arxiv.org/abs/2406.16858), EMNLP 2024；[EAGLE-3](https://arxiv.org/abs/2503.01840), 2025。
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 [2.2 节](stage2/02-gptq.md)与第 5.4.3 节。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.2 节与第 5.4.3 节。
 - Sadhukhan et al., [MagicDec: Breaking the Latency-Throughput Tradeoff for Long Context Generation with Speculative Decoding](https://arxiv.org/abs/2408.11049), ICLR 2025。
 - [vLLM 文档：Speculative Decoding](https://docs.vllm.ai/en/latest/features/spec_decode.html)。

@@ -109,6 +109,6 @@ gpt-oss 还使用了 **attention sink**：每个头有一个可学习的偏置�
 
 - Shazeer, [Fast Transformer Decoding: One Write-Head is All You Need](https://arxiv.org/abs/1911.02150), 2019。
 - Ainslie et al., [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245), EMNLP 2023。
-- DeepSeek-AI, [DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model](https://arxiv.org/abs/2405.04434), 2024，第 [2.1 节](stage2/01-quant-fundamentals.md) MLA。
+- DeepSeek-AI, [DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model](https://arxiv.org/abs/2405.04434), 2024，第 2.1 节 MLA。
 - Gemma Team, [Gemma 3 Technical Report](https://arxiv.org/abs/2503.19786), 2025。
 - Xiao et al., [Efficient Streaming Language Models with Attention Sinks](https://arxiv.org/abs/2309.17453), ICLR 2024。

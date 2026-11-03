@@ -80,7 +80,7 @@ vllm serve deepseek-ai/DeepSeek-V3 \
   --enable-eplb --eplb-config '{"num_redundant_experts": 16}'
 ```
 
-参数名随版本变化，以所用版本的文档为准。几个经验：
+参数名在不同版本之间有变化，使用前查对应版本的文档。几条经验：
 
 - 冗余专家占显存，在 KV Cache 紧张的 decode 上要权衡；prefill 的 batch 大、负载更平滑，冗余可以少一些。
 - 带投机解码时，草稿模型如果也是 MoE（如 DSpark），它的专家要单独统计和放置。
@@ -100,6 +100,6 @@ vllm serve deepseek-ai/DeepSeek-V3 \
 ## 延伸阅读
 
 - [DeepEP](https://github.com/deepseek-ai/DeepEP) 与 [EPLB](https://github.com/deepseek-ai/EPLB)。
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437), 2024。第 [3.4 节](stage3/04-speculative-decoding.md)的推理部署。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437), 2024。第 3.4 节的推理部署。
 - vLLM 团队，[vLLM Large Scale Serving: DeepSeek @ 2.2k tok/s/H200 with Wide-EP](https://vllm.ai/blog/2025-12-17-large-scale-serving)，2025。
 - vLLM 团队，[Serving DeepSeek-V4.1-Flash at Scale](https://vllm.ai/blog/2026-10-23-deepseek-v41-flash-pd-wide-ep)，2026。

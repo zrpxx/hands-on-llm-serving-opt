@@ -26,7 +26,7 @@ Hopper 和 Blackwell 引入了一系列新的硬件机制：
 | 编译 | JIT，较快 | JIT，基于 TVM | JIT，比 C++ 模板快得多 | 慢 |
 | 典型用户 | vLLM、SGLang 的大量自定义算子 | DeepSeek（V3.2 的 DSA、DeepInfer） | FlashAttention-4、CUTLASS 4 | cuBLAS、FlashAttention-3、DeepGEMM |
 
-Triton 还推出了更底层的 Gluon，让用户直接控制布局和流水线；PyTorch 团队推出了 Helion，在 Triton 之上提供更高层的抽象并自动调优。这个领域仍在快速变化。
+Triton 还推出了更底层的 Gluon，让用户直接控制布局和流水线；PyTorch 团队推出了 Helion，在 Triton 之上提供更高层的抽象并自动调优。
 
 ## 3. 读一个 TileLang 的矩阵乘法
 
@@ -55,7 +55,7 @@ def matmul(M, N, K, block_M=128, block_N=128, block_K=32, dtype="float16", accum
     return gemm
 ```
 
-和 Triton 相比，几个不同：
+和 Triton 相比，有三点不同：
 
 - **内存层次是显式的**：共享内存（`alloc_shared`）和寄存器（`alloc_fragment`）分开声明，数据在它们之间的搬运也是显式的 `T.copy`。在 Triton 中，`tl.load` 加载的数据放在哪里由编译器决定。
 - **流水线是声明式的**：`T.Pipelined(..., num_stages=3)` 一行就生成了多级的异步搬运与计算的重叠，在 Hopper 上会用到 TMA。

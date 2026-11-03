@@ -96,4 +96,4 @@ DeepSeek-V3 的技术报告还提到一个细节：H800 上 FP8 Tensor Core 内�
 
 - Frantar et al., [MARLIN: Mixed-Precision Auto-Regressive Parallel Inference on Large Language Models](https://arxiv.org/abs/2408.11743), PPoPP 2025，以及 [代码](https://github.com/IST-DASLab/marlin)。
 - [Introducing Machete, a mixed-input GEMM kernel optimized for NVIDIA Hopper GPUs](https://developers.redhat.com/articles/2024/10/14/introducing-machete-mixed-input-gemm-kernel)，Red Hat 开发者博客，2024。
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 [3.3 节](stage3/03-triton-kernels.md) FP8 训练，以及 [DeepGEMM](https://github.com/deepseek-ai/DeepGEMM)。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 3.3 节 FP8 训练，以及 [DeepGEMM](https://github.com/deepseek-ai/DeepGEMM)。

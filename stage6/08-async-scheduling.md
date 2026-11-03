@@ -2,7 +2,7 @@
 
 > 书外内容。原书第 10 章介绍了 vLLM V1 把预处理放到单独进程的做法（[5.4 节](final/04-multimodal-serving.md)），[3.6 节](stage3/06-profiling.md)用性能剖析观察过 CPU 开销。本节讨论更进一步的异步调度。模拟实验和组件是书外内容。
 
-[3.6 节](stage3/06-profiling.md)和项目 1 都观察到：模型越小、GPU 越快，decode 的每一步中 CPU 的开销占比越高。SGLang 的博客引用过一个估计：没有优化的推理引擎，可能有一半的时间花在 CPU 上。CUDA Graph 消除了 kernel 发射的开销（[3.6 节](stage3/06-profiling.md)），但每一步还有一段 CPU 工作无法放进 CUDA Graph：
+[3.6 节](stage3/06-profiling.md)和项目 1 都观察到：模型越小、GPU 越快，decode 的每一步中 CPU 的开销占比越高。SGLang 的博客引用过一个估计：未经优化的推理引擎，多达一半的时间花在 CPU 上。CUDA Graph 消除了 kernel 发射的开销（[3.6 节](stage3/06-profiling.md)），但每一步还有一段 CPU 工作无法放进 CUDA Graph：
 
 - **调度**：选出这一步参与的请求，分配 KV 块，前缀缓存的匹配；
 - **准备输入**：构造 `input_ids`、`positions`、block table 等张量，拷到 GPU；
@@ -51,7 +51,7 @@ python code/stage6/async_sched.py
 | vLLM | 异步调度：调度和准备输入与 GPU 执行重叠；从 v0.14 起默认开启，`--no-async-scheduling` 关闭 | 开启 |
 | DeepInfer | 异步的零开销批调度器 | 开启 |
 
-vLLM 2026 年的 Model Runner V2 进一步把输入的准备搬到了 GPU 上：请求的状态大部分常驻显存，用 Triton kernel 直接在 GPU 上构造 `input_ids`、`positions` 等张量，采样结果用单独的 CUDA 流异步拷回 CPU。在 GB200 上跑 Qwen3-0.6B（小模型，CPU 开销占比大），输出吞吐从每秒约 1.6 万提高到 2.5 万个 token。写作时它仍需通过 `VLLM_USE_V2_MODEL_RUNNER=1` 开启。
+vLLM 2026 年的 Model Runner V2 进一步把输入的准备搬到了 GPU 上：请求的状态大部分常驻显存，用 Triton kernel 直接在 GPU 上构造 `input_ids`、`positions` 等张量，采样结果用单独的 CUDA 流异步拷回 CPU。在 GB200 上跑 Qwen3-0.6B（小模型，CPU 开销占比大），输出吞吐从每秒约 1.6 万提高到 2.5 万个 token。目前它仍需通过 `VLLM_USE_V2_MODEL_RUNNER=1` 开启。
 
 ## 4. 异步也藏不住的情况
 

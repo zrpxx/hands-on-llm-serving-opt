@@ -8,7 +8,7 @@
 
 ## 1. W4A16 与 W8A8
 
-原书表 6-3 比较了两种方案，这里稍作补充：
+两种方案的对比（在原书表 6-3 的基础上补充）：
 
 | | W4A16（GPTQ、AWQ） | W8A8（INT8 或 FP8） |
 |---|---|---|
@@ -89,7 +89,7 @@ FP8 的 scale 有几种常见的粒度：
 | 按通道，动态 | 每个输出通道一个 scale | 每个 token 一个，动态计算 | LLM Compressor 的 `FP8_DYNAMIC` |
 | 按块 | 每 128×128 一个 scale | 每个 token 的每 128 个元素一个 | DeepSeek-V3、Qwen3 的官方 FP8 模型 |
 
-动态的 scale 需要在每次前向时先求一遍最大值，多一点开销，但不需要校准数据，也不怕实际输入的范围和校准时不同。精度通常比静态的好。
+动态的 scale 需要在每次前向时先求一遍最大值，多一点开销，但不需要校准数据，也不怕实际输入的范围与校准时不同，精度一般比静态的好。
 
 > [!NOTE]
 > 原书说 NVIDIA 的显卡中只有 Hopper 和 Blackwell 支持 FP8。实际上 Ada 架构（L4、L40S、RTX 4090）也有 FP8 Tensor Core。在 A100 等 Ampere 显卡上，vLLM 会把 FP8 模型当作只量化权重的 W8A16 来运行，能省显存和带宽，但矩阵乘法仍然是 BF16。
@@ -158,7 +158,7 @@ QUANTLAB_IMPL=solution python tools/outlier_layer.py --outlier-scale 20
 | 没有离群通道 | 2.00e-4 | 1.09e-4 | 1.77e-4 | 1.39e-3 |
 | 离群通道放大 20 倍 | 5.62e-3 | 9.89e-4 | 3.87e-4 | 1.12e-3 |
 
-几个值得注意的地方：
+三点观察：
 
 - 离群值让按张量的 INT8 误差增大了约 28 倍，按 token 的增大了约 9 倍。
 - SmoothQuant 之后，即使激活按张量量化，误差也比按 token 的还小。

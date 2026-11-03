@@ -2,7 +2,7 @@
 
 > 对应原书第 10 章 *Performance Profiling Strategies*。vLLM 内置的剖析接口、CUDA Graph 的原理是书外内容。
 
-前面几节讲了很多优化手段，但在一个具体的服务里，哪一项最值得做，要靠测量来回答。当服务达到一定规模后，几个百分点的性能提升就能节省可观的硬件成本。这一节介绍怎样从"服务慢了"的现象出发，自顶向下定位具体的原因。
+前面几节讲了很多优化手段，但在一个具体的服务里哪一项最值得做，要靠测量回答。服务规模上去之后，几个百分点的性能提升就能省下可观的硬件成本。这一节介绍怎样从"服务慢了"的现象出发，自顶向下定位具体的原因。
 
 ## 1. 三个层次
 
@@ -18,7 +18,7 @@
 
 ## 2. 从现象到原因
 
-原书图 10-3 给出了一个决策流程，大意如下：
+原书图 10-3 给出了一个决策流程，概括如下：
 
 ```mermaid
 flowchart TD
@@ -49,7 +49,7 @@ decode 时最常见的瓶颈不在 GPU 上。每生成一个 token，模型要�
 
 用 `--enforce-eager` 启动 vLLM 可以关闭 CUDA Graph 和编译，在调试时很有用，也可以用来体会它的作用。
 
-除了 CUDA Graph，降低 CPU 开销的手段还有：把调度、输入准备与 GPU 执行重叠起来（[6.8 节](stage6/08-async-scheduling.md)的异步调度），以及把预处理、分词、反分词放到单独的进程中。原书提到，vLLM V1 把 API 服务、输入预处理与 GPU 执行拆到不同的进程，就是为了避免多模态预处理这类 CPU 密集的工作阻塞 kernel 的发射。
+除了 CUDA Graph，降低 CPU 开销的手段还有：把调度、输入准备与 GPU 执行重叠起来（[6.8 节](stage6/08-async-scheduling.md)的异步调度），以及把预处理、分词、反分词放到单独的进程中。vLLM V1 把 API 服务、输入预处理与 GPU 执行拆到不同的进程，就是为了不让多模态预处理这类 CPU 密集的工作阻塞 kernel 的发射。
 
 ## 4. PyTorch Profiler
 
@@ -87,7 +87,7 @@ aten::scaled_dot_product_attention  0.37%   3.184ms           64
 平均每步 9.40 ms，每步约 2037 次 aten 算子调用
 ```
 
-这张表里有几个值得追问的地方：
+这张表里有三处值得追问：
 
 - **一个 8 层的模型，每一步有两千多次算子调用。** 平均每层两百多次，大部分是 `transpose`、`view`、`to` 这样的小操作。每一次都要经过 Python 和 PyTorch 的分派。
 - **`decode_step` 自身占了 24% 的时间**，这是不在任何 aten 算子里的部分，主要是 Hugging Face 模型代码本身的 Python 开销。
@@ -104,7 +104,7 @@ VLLM_TORCH_PROFILER_DIR=./vllm_profile vllm serve Qwen/Qwen3-0.6B
 vllm bench serve --model Qwen/Qwen3-0.6B --dataset-name random --num-prompts 50 --profile
 ```
 
-压测工具会在开始和结束时分别调用服务的 `/start_profile` 和 `/stop_profile` 接口，时间线保存在 `./vllm_profile` 下。剖析会明显拖慢服务，采集时请求数要少一些。不同版本的配置方式可能变化，以所用版本的文档为准。
+压测工具会在开始和结束时分别调用服务的 `/start_profile` 和 `/stop_profile` 接口，时间线保存在 `./vllm_profile` 下。剖析会明显拖慢服务，采集时请求数要少一些。配置方式在不同版本间有变化，使用前查对应版本的文档。
 
 ## 6. Nsight Systems 与 Nsight Compute
 
@@ -127,7 +127,7 @@ vLLM 会启动子进程，`--trace-fork-before-exec` 让 `nsys` 跟踪到这些�
 | 内存拷贝与计算串行 | 拷贝没有放到单独的 stream | 原书建议用多个 CUDA stream 让拷贝与计算重叠 |
 | 多卡时 NCCL 的 kernel 很长 | 通信没有与计算重叠，或者链路带宽不够 | 第 4 部分 |
 
-**Nsight Compute**（`ncu`）分析单个 kernel 的内部：达到了峰值带宽和算力的百分之多少（Speed of Light）、线程束的占用率、访存是否合并、在等什么。当一个 kernel 主导了耗时，就用它来判断该调参、替换还是融合。原书举的例子是：softmax kernel 反复从显存读取很大的中间张量，而不是放在共享内存里，这时应该换成融合的 kernel。
+**Nsight Compute**（`ncu`）分析单个 kernel 的内部：达到了峰值带宽和算力的百分之多少（Speed of Light）、线程束的占用率、访存是否合并、在等什么。当一个 kernel 主导了耗时，就用它来判断该调参、替换还是融合。比如 softmax kernel 反复从显存读取很大的中间张量，而不是放在共享内存里，这时应该换成融合的 kernel。
 
 ```bash
 # 分析项目 3 中的 FlashAttention kernel，只采集名字匹配的 kernel

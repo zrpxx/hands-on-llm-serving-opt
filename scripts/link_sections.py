@@ -20,7 +20,7 @@ for title, path in re.findall(r"\[([^\]]+)\]\(([^)]+\.md)\)", SIDEBAR):
         SECTIONS["项目" + m.group(1)] = path
 
 NUMS = r"\d\.\d{1,2}"
-REF = re.compile(rf"(?<![\d.\[])((?:{NUMS}\s*[、和与及]\s*)*{NUMS})(\s*节)")
+REF = re.compile(rf"(?<!第 )(?<![\d.\[])((?:{NUMS}\s*[、和与及]\s*)*{NUMS})(\s*节)")
 PROJ = re.compile(r"(?<![\[\w])项目 ([1-4])(?![\d\]])")
 
 

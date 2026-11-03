@@ -145,7 +145,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 `spec.py` 中的 `speculative_generate` 已经写好了外层的循环：起草、目标模型的一次前向、验证、统计。你要实现三个函数：
 
-- `rejection_sample`：[3.4 节](stage3/04-speculative-decoding.md)第 [2.2 节](stage2/02-gptq.md)的拒绝采样。
+- `rejection_sample`：[3.4 节](stage3/04-speculative-decoding.md)第 2.2 节的拒绝采样。
 - `greedy_verify`：贪心解码时的验证。
 - `ngram_propose`：在已有 token 中查找与结尾相同的 n-gram。
 

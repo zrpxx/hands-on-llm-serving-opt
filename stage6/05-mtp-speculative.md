@@ -14,7 +14,7 @@
 
 MTP 层与模型一起预训练，见过同样多的数据，而且在结构上比 Medusa 更完整：Medusa 只是在最后一层隐状态上挂几个彼此独立的线性头，而 DeepSeek-V3 的 MTP 模块是一个完整的 Transformer 层，预测第 $t+k$ 个位置时会把前一步的第 $t+k-1$ 个 token 嵌入与前一层隐状态拼接降维后再送入 Transformer 块，并直接复用主模型的词嵌入与输出头。因此它与目标模型的分布最接近：DeepSeek-V3 报告，其 MTP 模块预测的第二个 token 接受率达 85% 到 90%，decode 速度约提高到 1.8 倍。对推理系统来说，MTP 层是"自带"的：模型发布时就包含在权重里，不需要另找或另训草稿头。
 
-DeepSeek-V4.1-Flash 的 DSpark 更进一步。根据第三方解读，它用三个小的 Transformer 块一次前向预测之后 5 个位置，并带有一个**置信度头**，估计每个草稿被接受的概率。DeepInfer 的 README 说，由置信度估计来安排什么时候做验证。
+DeepSeek-V4.1-Flash 的 DSpark 更进一步：用三个小的 Transformer 块一次前向预测之后 5 个位置，并带一个**置信度头**，估计每个草稿被接受的概率。按 DeepInfer 的 README，验证的时机就由这个置信度决定。
 
 ## 2. 为什么需要置信度
 

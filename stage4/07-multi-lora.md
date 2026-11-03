@@ -40,11 +40,11 @@ CPU 耗时（仅供参考）：逐个 82.7 ms，分组 33.2 ms，批量 3.6 ms
 LoRA 部分的计算量是基座矩阵乘法的 3.1%
 ```
 
-原书提到的 **Punica** 专门为此设计了 kernel：SGMV（Segmented Gather Matrix-Vector multiplication）把 batch 中的请求按适配器分段，在一次 kernel 调用中完成所有段的计算；BGMV 则为每个请求收集它自己的适配器权重，适合 decode 时每个请求只有一个 token 的情况。论文报告，与当时最好的系统相比，同一组 GPU 上的吞吐提高了 12 倍。
+**Punica** 专门为此设计了 kernel：SGMV（Segmented Gather Matrix-Vector multiplication）把 batch 中的请求按适配器分段，在一次 kernel 调用中完成所有段的计算；BGMV 则为每个请求收集它自己的适配器权重，适合 decode 时每个请求只有一个 token 的情况。论文报告，与当时最好的系统相比，同一组 GPU 上的吞吐提高了 12 倍。
 
 ## 3. 很多个适配器
 
-适配器多到显存放不下时，就要像多模型服务（[4.5 节](stage4/05-multi-model-serving.md)）那样管理一个适配器的缓存：活跃的适配器放在显存中，不活跃的放在 CPU 内存或磁盘上，需要时再加载。原书也是这样描述的：所有活跃的适配器都已加载、随时可用，冷的适配器在需要时从 CPU 内存或磁盘加载。
+适配器多到显存放不下时，就要像多模型服务（[4.5 节](stage4/05-multi-model-serving.md)）那样管理一个适配器的缓存：活跃的适配器放在显存中，不活跃的放在 CPU 内存或磁盘上，需要时再加载。
 
 适配器的加载比整个模型快得多（几十 MB 对几十 GB），但它和 KV Cache 争夺同一块显存。**S-LoRA** 提出用统一的分页方式（Unified Paging）管理两者：适配器的权重和 KV Cache 都以页为单位存放在同一个内存池中，减少碎片，并配合自定义的 **MBGMM / MBGMV** 算子直接从非连续的分页显存中读取不同秩 $r$ 的适配器权重。论文中一张 GPU 可以服务几千个适配器，吞吐比当时的 vLLM 加 PEFT 的方案高约 4 倍。
 
@@ -71,7 +71,7 @@ curl http://localhost:8000/v1/chat/completions -H "Content-Type: application/jso
 
 ## 5. 什么时候不该用
 
-原书指出，Multi-LoRA 不是所有微调模型的默认选择：如果每个适配器自己的流量就大到需要多个副本，那么更好的做法是把适配器合并进基座模型，作为独立的模型分别部署。Multi-LoRA 适合的是**每个适配器的流量都不大**、单独部署无法用满一张 GPU 的情况。
+Multi-LoRA 并不是所有微调模型的默认选择：如果每个适配器自己的流量就大到需要多个副本，那么更好的做法是把适配器合并进基座模型，作为独立的模型分别部署。Multi-LoRA 适合的是**每个适配器的流量都不大**、单独部署无法用满一张 GPU 的情况。
 
 原因在于 Multi-LoRA 的开销：LoRA 部分的计算虽然少，却是额外的 kernel；`--max-loras` 预留的空间减少了 KV Cache；不同适配器的请求也无法共享前缀缓存（缓存的键中包含了适配器）。流量大的时候，这些开销都不如合并权重来得划算。
 
