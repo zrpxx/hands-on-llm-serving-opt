@@ -743,7 +743,7 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
 /* =========================================================================
    主页
    ========================================================================= */
-body.is-home .markdown-section { max-width: 960px; padding-top: 12px; }
+body.is-home .markdown-section { max-width: 1000px; padding-top: 20px; margin-left: auto; margin-right: auto; }
 body.is-home .markdown-section > h1 { display: none; }
 body.is-home .markdown-section > div:first-child:not([class]) { display: none; }
 body.is-home .sidebar .app-sub-sidebar { display: none !important; }
@@ -778,6 +778,12 @@ body.is-home .sidebar .app-sub-sidebar { display: none !important; }
   margin: 0 0 1.5em;
 }
 .home-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.home-scope {
+  margin: 1.1em 0 0 !important;
+  font-size: 0.84rem;
+  line-height: 1.7 !important;
+  color: var(--ink-3);
+}
 .home-actions a {
   display: inline-flex;
   align-items: center;
@@ -834,6 +840,7 @@ body.is-home .sidebar .app-sub-sidebar { display: none !important; }
   padding: 3px 6px;
   border-radius: 3px;
   white-space: nowrap;
+  font-family: var(--font-body);
   flex-shrink: 0;
 }
 .kv-pool-ctrls { display: inline-flex; gap: 4px; flex-shrink: 0; }
@@ -1173,8 +1180,8 @@ body.is-home .markdown-section h2 { border-bottom: 0; padding-bottom: 0; }
 }
 .home-proj-row {
   display: grid;
-  grid-template-columns: 12.5em minmax(0, 1fr) 9.5em;
-  gap: 8px 24px;
+  grid-template-columns: 15em minmax(0, 1fr) 10em;
+  gap: 8px 28px;
   padding: 14px 0;
   border-bottom: 1px solid var(--rule);
   align-items: baseline;
@@ -1192,8 +1199,9 @@ body.is-home .markdown-section h2 { border-bottom: 0; padding-bottom: 0; }
   gap: 2px;
 }
 .home-proj-idx {
-  font: 600 0.68rem/1.2 var(--font-mono);
-  letter-spacing: 0.05em;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--decode-ink);
 }
 .home-proj-name > a:first-of-type {
@@ -1228,10 +1236,12 @@ body.is-home .markdown-section h2 { border-bottom: 0; padding-bottom: 0; }
 /* 底部双栏：前置要求与本地运行 */
 .home-bottom-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: 36px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   margin-top: 0.5em;
 }
+.home-bottom-col { min-width: 0; }
+.home-bottom-col pre { overflow-x: auto; }
 .home-bottom-col .home-section-title { margin-top: 2.2em; }
 .home-spec-list {
   margin: 0.6em 0 0 !important;

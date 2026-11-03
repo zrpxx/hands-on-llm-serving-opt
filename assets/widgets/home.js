@@ -20,8 +20,8 @@
       <div class="kv-pool" role="region" aria-label="分页 KV Cache 块池实时示意">
         <div class="kv-pool-head">
           <div class="kv-pool-title">
-            <span class="kv-pool-fig">FIG 0.1</span>
-            <span>Paged KV Cache 物理块池（128 块）</span>
+            <span class="kv-pool-fig">图 0.1</span>
+            <span>分页 KV Cache 块池</span>
           </div>
           <div class="kv-pool-ctrls">
             <button type="button" class="kv-pool-btn" data-toggle>${reduce ? '继续' : '暂停'}</button>
