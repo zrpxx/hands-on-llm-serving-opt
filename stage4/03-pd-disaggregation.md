@@ -2,7 +2,7 @@
 
 > 对应原书第 7 章 *Prefill-Decode Disaggregation*。goodput 的定义、Mooncake 和各引擎的具体用法是书外内容。
 
-0.4 节说过，prefill 和 decode 是两种完全不同的负载：prefill 一次处理整个 prompt，受限于算力；decode 每步只处理一个 token，受限于显存带宽。1.2 节的 chunked prefill 把长 prompt 切成小块，和 decode 混在同一批里执行，缓解了两者的相互干扰。但只要它们在同一组 GPU 上运行，干扰就无法完全消除：一个 decode 步里混进了 2000 个 prefill token，这一步就从 10 毫秒变成了 50 毫秒，所有正在 decode 的请求都会卡一下。
+[0.4 节](stage0/04-kv-cache-prefill-decode.md)说过，prefill 和 decode 是两种完全不同的负载：prefill 一次处理整个 prompt，受限于算力；decode 每步只处理一个 token，受限于显存带宽。[1.2 节](stage1/02-continuous-batching.md)的 chunked prefill 把长 prompt 切成小块，和 decode 混在同一批里执行，缓解了两者的相互干扰。但只要它们在同一组 GPU 上运行，干扰就无法完全消除：一个 decode 步里混进了 2000 个 prefill token，这一步就从 10 毫秒变成了 50 毫秒，所有正在 decode 的请求都会卡一下。
 
 PD 分离（Prefill-Decode Disaggregation）的做法是把两个阶段放到不同的 GPU 上：一组实例只做 prefill，一组只做 decode，prefill 算完后把 KV Cache 传给 decode 实例。
 
@@ -11,11 +11,11 @@ PD 分离（Prefill-Decode Disaggregation）的做法是把两个阶段放到不
 把两个阶段拆开有四点直接的好处：
 
 - **TTFT 和 ITL 可以分别优化。** 不同应用的输入输出比例相差很大（原书图 7-14）。输入长、对首 token 敏感的应用，可以多配 prefill 实例；输出长、对流畅度敏感的应用，可以多配 decode 实例。decode 不再被 prefill 打断，ITL 更稳定。
-- **两个阶段可以分别调参。** prefill 可以用足够大的 batch 让 Tensor Core 跑满；decode 可以把 batch 调到在满足 ITL 的前提下尽量大。两者甚至可以用不同的并行方式，比如 prefill 用 TP、decode 用更大的 EP（4.2 节）。
+- **两个阶段可以分别调参。** prefill 可以用足够大的 batch 让 Tensor Core 跑满；decode 可以把 batch 调到在满足 ITL 的前提下尽量大。两者甚至可以用不同的并行方式，比如 prefill 用 TP、decode 用更大的 EP（[4.2 节](stage4/02-expert-parallelism.md)）。
 - **可以用不同的硬件。** prefill 需要算力，decode 需要显存容量和带宽。H100 和 H200 的算力相同，但 H200 的显存更大、带宽更高（141 GB、4.8 TB/s 对 80 GB、3.35 TB/s），因此 H100 适合 prefill、H200 适合 decode；对 decode 要求不高时，也可以选用性价比更高的 L40S。
 - **可以分别扩缩容。** prefill 直接面对新到达的请求，负载波动大，可以更积极地扩缩；decode 的负载由正在生成的请求决定，相对平稳。
 
-DistServe（OSDI 2024）把这个思路系统化，并提出用 **goodput** 衡量服务能力：在满足 TTFT 和 TPOT 目标的前提下，每秒能处理多少请求（0.8 节）。论文报告，与当时最好的聚合部署相比，同样的延迟目标下能多服务最多 7.4 倍的请求，或者在同样的请求量下满足严格 12.6 倍的延迟目标。
+DistServe（OSDI 2024）把这个思路系统化，并提出用 **goodput** 衡量服务能力：在满足 TTFT 和 TPOT 目标的前提下，每秒能处理多少请求（[0.8 节](stage0/08-metrics.md)）。论文报告，与当时最好的聚合部署相比，同样的延迟目标下能多服务最多 7.4 倍的请求，或者在同样的请求量下满足严格 12.6 倍的延迟目标。
 
 ## 2. 架构
 
@@ -33,7 +33,7 @@ flowchart LR
   D2 --> C
 ```
 
-实际的系统还要处理很多细节：prefill 实例怎样选、decode 实例怎样选、KV 传到一半失败了怎么办、decode 实例的 KV 空间不够时怎么排队。项目 4 的模拟器实现了一个简化的版本。
+实际的系统还要处理很多细节：prefill 实例怎样选、decode 实例怎样选、KV 传到一半失败了怎么办、decode 实例的 KV 空间不够时怎么排队。[项目 4](stage4/boss-cluster-commander.md) 的模拟器实现了一个简化的版本。
 
 ## 3. KV 传输
 
@@ -64,7 +64,7 @@ PD 分离能不能带来收益，关键在于 KV 传输的开销能不能被收�
 - **分块传输**：不等整个 KV 算完再传，而是像视频流一样分成小块传；
 - **异步传输**：传输使用非阻塞操作，与计算重叠；
 - **逐层传输**：KV 是逐层产生的，每算完一层就开始传这一层，后面各层的计算与前面各层的传输重叠。prefill 结束时，只剩最后一层的 KV 还没传；
-- **压缩 KV**：比如 FP8 KV Cache（2.5 节），或者 LMCache 的 CacheGen（4.4 节）。
+- **压缩 KV**：比如 FP8 KV Cache（[2.5 节](stage2/05-kv-cache-quant.md)），或者 LMCache 的 CacheGen（[4.4 节](stage4/04-advanced-kv-cache.md)）。
 
 配合这些优化后，PD 分离的传输暴露开销通常可以压到每个请求总延迟的 1% 以下（原书图 7-18）。
 
@@ -119,7 +119,7 @@ CLUSTER_IMPL=solution python run.py pd --rate 6 --link 5 --no-layerwise
 - **SGLang** 用 `--disaggregation-mode prefill` 或 `decode` 启动两类实例，传输后端可选 Mooncake 或 NIXL，再用 `sglang_router` 的 PD 模式把它们组织起来。
 - **NVIDIA Dynamo** 和 **llm-d** 是建立在 vLLM、SGLang 等引擎之上的分布式推理框架，提供 PD 分离、KV 感知路由、自动扩缩容等功能。
 
-Kimi 的 Mooncake 是另一个有代表性的设计：它以 KV Cache 为中心组织整个集群，把各节点的 CPU 内存和 SSD 汇集成一个分布式的 KV 池，prefill 和 decode 都围绕这个池调度。4.4 节会讨论 KV Cache 的分层存储。
+Kimi 的 Mooncake 是另一个有代表性的设计：它以 KV Cache 为中心组织整个集群，把各节点的 CPU 内存和 SSD 汇集成一个分布式的 KV 池，prefill 和 decode 都围绕这个池调度。[4.4 节](stage4/04-advanced-kv-cache.md)会讨论 KV Cache 的分层存储。
 
 ## 7. 实验
 

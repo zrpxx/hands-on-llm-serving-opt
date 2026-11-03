@@ -1,6 +1,6 @@
 # 6.6 长上下文：稀疏注意力与上下文并行
 
-> 书外内容。3.1 节讨论了 MQA、GQA、MLA 与滑动窗口，4.4 节讨论了 KV Cache 的卸载与分层存储。本节讨论 128K 到 1M 上下文下的三个问题：KV 怎样变小、注意力怎样少算、一条序列怎样切到多张卡上。
+> 书外内容。[3.1 节](stage3/01-attention-variants.md)讨论了 MQA、GQA、MLA 与滑动窗口，[4.4 节](stage4/04-advanced-kv-cache.md)讨论了 KV Cache 的卸载与分层存储。本节讨论 128K 到 1M 上下文下的三个问题：KV 怎样变小、注意力怎样少算、一条序列怎样切到多张卡上。
 
 Agent、代码库问答、长文档分析都需要很长的上下文，主流模型的上下文窗口已经到了 128K 到 1M。长上下文对推理的压力来自三个方面：KV Cache 的显存、decode 时每步读取的 KV、prefill 时与长度平方成正比的计算。
 
@@ -19,7 +19,7 @@ python code/stage6/long_context.py
    DeepSeek-V4.1-Flash（全局 KV，FP4）    0.9 KB    0.1 GB    0.9 GB
 ```
 
-用 GQA 的模型，一条 1M 的序列就需要上百 GB 的 KV，一张卡放不下。降低 KV 的手段可以叠加：MLA 把 KV 压缩成低维的潜在向量（3.1 节）；KV 量化到 FP8 甚至 FP4（2.5 节）；跨层共享（YOCO 一类的结构，6.1 节）；以及只为少数层保留全局的 KV，其余层只用滑动窗口。DeepSeek-V4.1-Flash 把这些都用上了，每个 token 不到 1 KB，比 MLA 又小了约 80 倍。
+用 GQA 的模型，一条 1M 的序列就需要上百 GB 的 KV，一张卡放不下。降低 KV 的手段可以叠加：MLA 把 KV 压缩成低维的潜在向量（[3.1 节](stage3/01-attention-variants.md)）；KV 量化到 FP8 甚至 FP4（[2.5 节](stage2/05-kv-cache-quant.md)）；跨层共享（YOCO 一类的结构，[6.1 节](stage6/01-deepinfer-overview.md)）；以及只为少数层保留全局的 KV，其余层只用滑动窗口。DeepSeek-V4.1-Flash 把这些都用上了，每个 token 不到 1 KB，比 MLA 又小了约 80 倍。
 
 ## 2. 每一步要读多少
 
@@ -67,7 +67,7 @@ prefill 一条 1M 的序列，计算量与长度的平方成正比，单卡要�
 
 首尾配对（也称 zigzag 切分）之后，每张卡的计算量几乎相同。DeepInfer 的"均衡的上下文并行"（balanced context parallelism）指的就是这类做法。
 
-decode 时也可以用 CP：把一条长序列的 KV 分散存在几张卡上，每张卡算自己那部分的注意力，再合并（用 3.2 节在线 softmax 的方法）。这让单条序列的 KV 不再受一张卡的显存限制。
+decode 时也可以用 CP：把一条长序列的 KV 分散存在几张卡上，每张卡算自己那部分的注意力，再合并（用 [3.2 节](stage3/02-flashattention.md)在线 softmax 的方法）。这让单条序列的 KV 不再受一张卡的显存限制。
 
 ## 4. 结构与系统的配合
 
@@ -76,7 +76,7 @@ decode 时也可以用 CP：把一条长序列的 KV 分散存在几张卡上，
 | 结构上的做法 | 对推理系统的要求 |
 |---|---|
 | 滑动窗口与全局层交替 | KV Cache 管理器要支持不同层有不同的缓存长度（vLLM 的混合分配器） |
-| 跨层共享 KV、编码器与解码器分开 | prefill 时上层可以只算最后一段（6.1 节的 bounded replay） |
+| 跨层共享 KV、编码器与解码器分开 | prefill 时上层可以只算最后一段（[6.1 节](stage6/01-deepinfer-overview.md)的 bounded replay） |
 | 稀疏注意力的索引器 | 需要 top-k 等专门的算子，还要为索引键单独分配缓存 |
 | FP4 的 KV | 注意力 kernel 要直接读 4 位的 KV |
 

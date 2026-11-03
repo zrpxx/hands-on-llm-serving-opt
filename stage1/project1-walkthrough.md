@@ -21,7 +21,7 @@
 | 10 | 后台引擎循环与 token 分发 | `server.py` | `-k step10`，然后 `pytest tests/test_server.py` | 30 分钟 |
 | 11 | 在真实模型上跑起来并压测 | — | `bench.py` | 60 分钟 |
 
-所有命令都在 `code/project1/` 目录下执行。第 0~10 步只需要 CPU。
+所有命令都在 [`code/project1/`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project1) 目录下执行。第 0~10 步只需要 CPU。
 
 每一步的结构相同：
 
@@ -336,7 +336,7 @@ def _admit(self, budget: int, allow_partial: bool):
 <summary>答案</summary>
 
 1. decode（差值为 1）和 prompt 还没算完的切块 prefill（差值为剩余 prompt 长度）。用同一个差值公式即可，不需要区分。
-2. 它们已经占着 KV 块，用户已经在等后续 token；优先保证它们继续，TPOT 才稳定，已开始的请求也不会饿死（1.3 节“每一步的顺序”）。
+2. 它们已经占着 KV 块，用户已经在等后续 token；优先保证它们继续，TPOT 才稳定，已开始的请求也不会饿死（[1.3 节](stage1/03-paged-attention-vllm.md)“每一步的顺序”）。
 
 </details>
 
@@ -765,7 +765,7 @@ diff mine.txt ref.txt | head
 <details>
 <summary>答案</summary>
 
-1. 不能。`asyncio.Queue` 只能在它所属事件循环的线程里操作。要用 `loop.call_soon_threadsafe(q.put_nowait, item)`，让事件循环线程去执行（1.1 节）。
+1. 不能。`asyncio.Queue` 只能在它所属事件循环的线程里操作。要用 `loop.call_soon_threadsafe(q.put_nowait, item)`，让事件循环线程去执行（[1.1 节](stage1/01-serving-from-scratch.md)）。
 2. 阻塞在 `self.inbox.get()` 上等待新命令，而不是空转反复调用 `step()`。
 3. `new_token_id` 为 `None` 的（切块 prefill 中间步，没有采样）；以及 `self.streams` 中找不到的（请求已被中止）。
 

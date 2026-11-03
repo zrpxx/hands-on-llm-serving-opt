@@ -36,7 +36,7 @@ DeepSeek-V3 的每个 token 只用 370 亿参数计算，计算量与一个 37B 
 3. **专家计算**：每张卡把发给同一个专家的 token 收集起来，做一次矩阵乘法。多个专家的矩阵乘法通常合并成一个 grouped GEMM kernel。
 4. **combine**：把结果送回 token 原来所在的卡，按路由权重加权求和，又是一次 all-to-all。
 
-`code/stage4/moe_demo.py` 在 CPU 上模拟了这四步，验证按专家分组计算与逐个计算的结果相同：
+[`code/stage4/moe_demo.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage4/moe_demo.py) 在 CPU 上模拟了这四步，验证按专家分组计算与逐个计算的结果相同：
 
 ```bash
 python code/stage4/moe_demo.py --experts 64 --topk 4 --ep 8
@@ -59,19 +59,19 @@ dispatch + combine 的跨卡数据量（BF16）：7.0 MiB，是这一层输入�
 
 MoE 模型中，注意力和专家适合不同的并行方式：
 
-- **注意力**的参数不多，如果用 TP 切开，每层多两次 all-reduce。MLA（3.1 节）只有一份隐向量，TP 时每张卡都要存完整的 KV Cache，切了反而浪费。所以注意力常用**数据并行**：每张卡（或每组卡）处理不同的请求，各自保存自己请求的 KV。
+- **注意力**的参数不多，如果用 TP 切开，每层多两次 all-reduce。MLA（[3.1 节](stage3/01-attention-variants.md)）只有一份隐向量，TP 时每张卡都要存完整的 KV Cache，切了反而浪费。所以注意力常用**数据并行**：每张卡（或每组卡）处理不同的请求，各自保存自己请求的 KV。
 - **专家**的参数占了绝大部分，用 **EP** 分散到所有卡上。
 
 于是每个 MoE 层的前后，token 在"按请求分布"和"按专家分布"之间来回转换，这正是 dispatch 和 combine 的作用。
 
-DeepSeek-V3 的技术报告给出了它的部署方式：prefill 阶段的最小部署单元是 4 台机器、32 张 H800，MoE 部分 EP = 32；decode 阶段是 40 台机器、320 张卡，MoE 部分 EP = 320，其中 256 张卡各放 1 个路由专家，其余 64 张卡存放冗余的热门路由专家与共享专家副本。prefill 和 decode 分开部署（4.3 节），各自选择最适合的并行方式。
+DeepSeek-V3 的技术报告给出了它的部署方式：prefill 阶段的最小部署单元是 4 台机器、32 张 H800，MoE 部分 EP = 32；decode 阶段是 40 台机器、320 张卡，MoE 部分 EP = 320，其中 256 张卡各放 1 个路由专家，其余 64 张卡存放冗余的热门路由专家与共享专家副本。prefill 和 decode 分开部署（[4.3 节](stage4/03-pd-disaggregation.md)），各自选择最适合的并行方式。
 
 ## 5. 负载均衡
 
 EP 下，一个 MoE 层的耗时由最忙的那张卡决定。负载不均的原因有两个：专家本身的热度不同，以及同一批 token 碰巧集中选了某几个专家。处理的办法有：
 
 - **训练时的均衡**。训练时加入辅助损失，或者像 DeepSeek-V3 那样给每个专家一个可调的偏置，让各专家被选中的频率接近。
-- **冗余专家与重新分配**。统计各专家的负载，把热门专家复制几份放到不同的卡上，并重新安排专家的位置，让每张卡的总负载接近。DeepSeek 开源了这个算法（EPLB），6.3 节会详细讨论。
+- **冗余专家与重新分配**。统计各专家的负载，把热门专家复制几份放到不同的卡上，并重新安排专家的位置，让每张卡的总负载接近。DeepSeek 开源了这个算法（EPLB），[6.3 节](stage6/03-wide-ep-eplb.md)会详细讨论。
 - **更快的通信库**。DeepSeek 开源的 DeepEP 为 all-to-all 提供了两套 kernel：prefill 用的高吞吐版本，以及 decode 用的低延迟版本，后者直接通过 RDMA 通信，并且能与计算重叠。
 
 ## 6. 在实际中使用
@@ -98,7 +98,7 @@ vLLM 中，MoE 层的 EP 大小等于 TP 与 DP 的乘积。不加 `--enable-exp
 
 ## 延伸阅读
 
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.1.2 节（DeepSeekMoE 与无辅助损失的负载均衡）和第 3.4 节（推理部署）。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.1.2 节（DeepSeekMoE 与无辅助损失的负载均衡）和第 [3.4 节](stage3/04-speculative-decoding.md)（推理部署）。
 - [DeepEP](https://github.com/deepseek-ai/DeepEP) 与 [EPLB](https://github.com/deepseek-ai/EPLB)。
 - Grootendorst, [A Visual Guide to Mixture of Experts](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts), 2024。原书推荐的 MoE 入门读物。
 - [vLLM 文档：Expert Parallel Deployment](https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment.html)。

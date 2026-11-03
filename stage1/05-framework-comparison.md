@@ -10,11 +10,11 @@ TorchServe、TensorFlow Serving、Triton Inference Server 这类通用模型服�
 
 | LLM 服务的特点 | 通用框架的做法 | LLM 推理框架的做法 |
 |---|---|---|
-| 一次请求要做几百上千步前向（0.3 节） | 把整个请求当作一次调用 | 按步调度，每一步都可以有序列加入和离开（1.2 节） |
-| KV Cache 随生成不断增长（0.4 节） | 按最大长度分配连续空间 | 分页管理（1.3 节） |
-| 请求长短差异很大 | 整批同进同出 | 连续批处理和 chunked prefill（1.2 节） |
-| 请求之间有大量相同的前缀 | 每次从头计算 | 前缀缓存（1.4 节） |
-| decode 受显存带宽限制（0.7 节） | 通用算子 | 量化算子、FlashAttention、投机解码等（第 2、3 部分） |
+| 一次请求要做几百上千步前向（[0.3 节](stage0/03-autoregressive-generation.md)） | 把整个请求当作一次调用 | 按步调度，每一步都可以有序列加入和离开（[1.2 节](stage1/02-continuous-batching.md)） |
+| KV Cache 随生成不断增长（[0.4 节](stage0/04-kv-cache-prefill-decode.md)） | 按最大长度分配连续空间 | 分页管理（[1.3 节](stage1/03-paged-attention-vllm.md)） |
+| 请求长短差异很大 | 整批同进同出 | 连续批处理和 chunked prefill（[1.2 节](stage1/02-continuous-batching.md)） |
+| 请求之间有大量相同的前缀 | 每次从头计算 | 前缀缓存（[1.4 节](stage1/04-prefix-caching.md)） |
+| decode 受显存带宽限制（[0.7 节](stage0/07-roofline.md)） | 通用算子 | 量化算子、FlashAttention、投机解码等（第 2、3 部分） |
 
 Triton Inference Server 本身也在演进，现在可以把 vLLM 或 TensorRT-LLM 作为后端，自己只负责外围的模型管理和协议。
 
@@ -106,9 +106,9 @@ trtllm-serve Qwen/Qwen3-8B
 
 1. **先写下约束。** TTFT 和 TPOT 的 P99 上限，是否必须输出合法的 JSON，能用哪些硬件。
 2. **用自己的流量做测试数据。** 统计线上请求的输入、输出长度分布，以及前缀的重复程度。用别人的短对话数据集得出的结论，不一定适用于长文档的业务。
-3. **对齐条件再比较。** 同样的模型权重和精度，同样的最大长度，前缀缓存同时开或同时关，用同一个压测工具，比较满足 SLO 的 goodput（0.8 节）。
+3. **对齐条件再比较。** 同样的模型权重和精度，同样的最大长度，前缀缓存同时开或同时关，用同一个压测工具，比较满足 SLO 的 goodput（[0.8 节](stage0/08-metrics.md)）。
 4. **考虑运维。** 冷启动要多久，出错时日志是否好排查，监控指标是否齐全，版本升级是否频繁破坏兼容性。
-5. **用 OpenAI 兼容接口隔离。** 业务代码只调用 `/v1/chat/completions` 这样的标准接口，不直接依赖某个框架的 Python API。框架格局变化时，只需要更换后端的镜像和启动参数（1.1 节）。
+5. **用 OpenAI 兼容接口隔离。** 业务代码只调用 `/v1/chat/completions` 这样的标准接口，不直接依赖某个框架的 Python API。框架格局变化时，只需要更换后端的镜像和启动参数（[1.1 节](stage1/01-serving-from-scratch.md)）。
 
 ## 5. 实验：同一套压测比较 vLLM 和 SGLang
 

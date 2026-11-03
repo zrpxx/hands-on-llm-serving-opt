@@ -1,6 +1,6 @@
 # 项目 2　Quant Arena：亲手实现主流量化方法
 
-> 前置：2.1～2.8 节。代码在 [`code/project2`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project2)。全部开发、测试和小模型上的对比实验都可以在 CPU 上完成，真实模型的精度与性能实验需要 GPU。
+> 前置：2.1～[2.8 节](stage2/08-distillation-pruning.md)。代码在 [`code/project2`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project2)。全部开发、测试和小模型上的对比实验都可以在 CPU 上完成，真实模型的精度与性能实验需要 GPU。
 
 读懂 GPTQ 的推导和把它写对是两回事。这个项目从最基本的量化、反量化函数开始，依次实现 FP8、GPTQ、AWQ、SmoothQuant 和 KV Cache 量化，然后把它们用到一个真实结构（Qwen3）的小模型上，在同一个测试集上比较困惑度。所有实现都是**伪量化**（fake quantization）：量化之后立刻反量化回浮点数，用来测量精度。性能则交给 vLLM 在 GPU 上测。
 
@@ -96,7 +96,7 @@ python tools/train_tiny_lm.py --data data --out /tmp/tiny-lm    # 两核 CPU 约
 
 `fake_quant_fp8(x, granularity, fmt)` 先求 amax（`"tensor"` 整个张量一个，`"row"` 每行一个），scale $= \text{amax} / 448$，然后把 $x / \text{scale}$ 转换成 PyTorch 的 `torch.float8_e4m3fn`，再转回 float32 乘回 scale。PyTorch 的类型转换会按 E4M3 的规则舍入，我们不需要自己实现浮点舍入。
 
-一个例子：按张量量化 `[0.3, 1.7, 100, 448]`，amax 恰好是 448，scale 为 1，结果是 `[0.3125, 1.75, 96, 448]`。在 1 附近间隔是 0.125，在 64 到 128 之间间隔是 8，相对误差大致相同（2.1 节）。
+一个例子：按张量量化 `[0.3, 1.7, 100, 448]`，amax 恰好是 448，scale 为 1，结果是 `[0.3125, 1.75, 96, 448]`。在 1 附近间隔是 0.125，在 64 到 128 之间间隔是 8，相对误差大致相同（[2.1 节](stage2/01-quant-fundamentals.md)）。
 
 <details>
 <summary>提示：amax 为 0 的行</summary>
@@ -106,7 +106,7 @@ python tools/train_tiny_lm.py --data data --out /tmp/tiny-lm    # 两核 CPU 约
 
 ### 第 3 步：GPTQ
 
-`gptq_quantize` 的框架已经写好：处理从未激活的通道、act-order 的重排、阻尼、Cholesky 分解得到 $H^{-1}$ 的上三角因子、按块循环，以及块与块之间的批量补偿。要完成的是**块内**的逐列循环，对应 2.2 节第 4 节伪代码的内层：
+`gptq_quantize` 的框架已经写好：处理从未激活的通道、act-order 的重排、阻尼、Cholesky 分解得到 $H^{-1}$ 的上三角因子、按块循环，以及块与块之间的批量补偿。要完成的是**块内**的逐列循环，对应 [2.2 节](stage2/02-gptq.md)第 4 节伪代码的内层：
 
 ```text
 for i in range(块的宽度):
@@ -133,7 +133,7 @@ for i in range(块的宽度):
 <details>
 <summary>提示 3：为什么用上三角的 Cholesky 因子</summary>
 
-GPTQ 需要的是"量化了前 $i$ 列之后，剩余列的 $H^{-1}$"。2.2 节说明了，记 $H^{-1} = U^\top U$（代码中把这个上三角的 Cholesky 因子 $U$ 存放在变量 `Hinv` 中），消去前 $i$ 列后的逆矩阵第一行等于 $U_{i,i} \cdot U_{i, i:}$，对角元等于 $U_{i,i}^2$，相除后恰好约去一个 $U_{i,i}$，得到 `Hinv1[i, i:] / Hinv1[i, i]`。所以循环里直接按行读取 `Hinv1`，不需要在循环中更新任何逆矩阵。
+GPTQ 需要的是"量化了前 $i$ 列之后，剩余列的 $H^{-1}$"。[2.2 节](stage2/02-gptq.md)说明了，记 $H^{-1} = U^\top U$（代码中把这个上三角的 Cholesky 因子 $U$ 存放在变量 `Hinv` 中），消去前 $i$ 列后的逆矩阵第一行等于 $U_{i,i} \cdot U_{i, i:}$，对角元等于 $U_{i,i}^2$，相除后恰好约去一个 $U_{i,i}$，得到 `Hinv1[i, i:] / Hinv1[i, i]`。所以循环里直接按行读取 `Hinv1`，不需要在循环中更新任何逆矩阵。
 </details>
 
 测试检查 GPTQ 的输出误差比 RTN 小，并且每个量化后的值都落在它所在组的量化网格上。后者能发现一类常见的错误：把误差补偿加到了已经量化过的列上。
@@ -174,7 +174,7 @@ GPTQ 需要的是"量化了前 $i$ 列之后，剩余列的 $H^{-1}$"。2.2 节�
 
 ### 第 6 步：KV Cache 量化
 
-`fake_quant_kv(t, bits, axis, fmt)` 的输入形状是 `[tokens, heads, head_dim]`。按 token 量化时，每个 token 的每个头的 `head_dim` 个数共用一个 scale，直接调用 `fake_quant_int` 即可。按通道量化时，每个头的每个通道在所有 token 上共用一个 scale，要先把 tokens 换到最后一维。整数用非对称量化（2.5 节）。
+`fake_quant_kv(t, bits, axis, fmt)` 的输入形状是 `[tokens, heads, head_dim]`。按 token 量化时，每个 token 的每个头的 `head_dim` 个数共用一个 scale，直接调用 `fake_quant_int` 即可。按通道量化时，每个头的每个通道在所有 token 上共用一个 scale，要先把 tokens 换到最后一维。整数用非对称量化（[2.5 节](stage2/05-kv-cache-quant.md)）。
 
 测试构造了一个第 5 个通道放大 20 倍的 K，检查按通道量化的误差小于按 token。
 
@@ -218,7 +218,7 @@ python run.py --model /tmp/tiny-lm --data data --method none --kv-bits 2 --k-axi
 | KV Cache | 4 位，K 按通道 | 38.20 |
 | KV Cache | 2 位，K 按通道 | 46.04 |
 
-然后用 `tools/outlier_layer.py` 在带离群通道的层上再比较一次（2.3、2.4 节有它的结果）。
+然后用 `tools/outlier_layer.py` 在带离群通道的层上再比较一次（[2.3](stage2/03-awq.md)、[2.4](stage2/04-activation-quant.md) 节有它的结果）。
 
 最后写一段分析，回答三个问题：
 
@@ -239,7 +239,7 @@ vllm serve Qwen/Qwen3-8B-FP8 --max-model-len 8192
 vllm serve Qwen/Qwen3-8B-FP8 --max-model-len 8192 --kv-cache-dtype fp8
 ```
 
-**性能。** 对每个配置，用 2.7 节第 5 节的脚本在并发 1、4、16、64、128 下压测，画出输出吞吐和 TPOT 随并发变化的曲线，找出 AWQ 和 FP8 的交叉点。用 2.6 节的组件解释交叉点出现的位置。确认日志中的 kernel：AWQ 应该是 Marlin 或 Machete，FP8 应该是 CUTLASS 的 FP8 GEMM（Ampere 上是 Marlin 的 W8A16）。
+**性能。** 对每个配置，用 [2.7 节](stage2/07-choosing-quantization.md)第 5 节的脚本在并发 1、4、16、64、128 下压测，画出输出吞吐和 TPOT 随并发变化的曲线，找出 AWQ 和 FP8 的交叉点。用 [2.6 节](stage2/06-quant-kernels.md)的组件解释交叉点出现的位置。确认日志中的 kernel：AWQ 应该是 Marlin 或 Machete，FP8 应该是 CUTLASS 的 FP8 GEMM（Ampere 上是 Marlin 的 W8A16）。
 
 **精度。** 用 lm-eval 在 GSM8K 上比较三个模型：
 
@@ -248,9 +248,9 @@ lm_eval --model vllm --model_args pretrained=Qwen/Qwen3-8B-AWQ,max_model_len=409
   --tasks gsm8k --batch_size auto
 ```
 
-计算恢复率。有余力的话，统计两个模型答案不同的题目比例（2.7 节的 flips）。
+计算恢复率。有余力的话，统计两个模型答案不同的题目比例（[2.7 节](stage2/07-choosing-quantization.md)的 flips）。
 
-**自己量化。** 用 2.2 节的 LLM Compressor 脚本对 Qwen3-8B 做 W4A16 GPTQ，和官方的 AWQ 版本比较精度和性能。也可以直接用本项目的 `run.py` 对 Qwen3-0.6B 做伪量化（`--model` 指向模型目录，加 `--device cuda`），观察真实模型上 AWQ 与 RTN 的差距是否比小模型大。
+**自己量化。** 用 [2.2 节](stage2/02-gptq.md)的 LLM Compressor 脚本对 Qwen3-8B 做 W4A16 GPTQ，和官方的 AWQ 版本比较精度和性能。也可以直接用本项目的 `run.py` 对 Qwen3-0.6B 做伪量化（`--model` 指向模型目录，加 `--device cuda`），观察真实模型上 AWQ 与 RTN 的差距是否比小模型大。
 
 ## 4. 完成标准
 
@@ -260,10 +260,10 @@ lm_eval --model vllm --model_args pretrained=Qwen/Qwen3-8B-AWQ,max_model_len=409
 
 ## 5. 扩展练习
 
-- **AWQ 的截断搜索。** 2.3 节提到 AWQ 还会搜索每组的截断比例。在 `awq.py` 中加上这一步，看 3 位时能改善多少。
+- **AWQ 的截断搜索。** [2.3 节](stage2/03-awq.md)提到 AWQ 还会搜索每组的截断比例。在 `awq.py` 中加上这一步，看 3 位时能改善多少。
 - **SparseGPT。** 把 `gptq.py` 改成剪枝：把"量化到最近的等级"换成"按 2:4 的模式置零"，其余的误差补偿不变。与 `tools/prune_24.py` 中不做补偿的结果比较。
 - **KL 散度评测。** 在 `eval.py` 中增加一个函数，计算量化模型与原模型在每个位置的输出分布的 KL 散度。比较它和困惑度的差别，哪个对小的误差更敏感？
-- **旋转。** 在一个线性层上实现 2.4 节提到的旋转：给激活右乘一个随机正交矩阵（如归一化的 Hadamard 矩阵），权重同时左乘它的转置。比较旋转前后 W4A4 的误差。
+- **旋转。** 在一个线性层上实现 [2.4 节](stage2/04-activation-quant.md)提到的旋转：给激活右乘一个随机正交矩阵（如归一化的 Hadamard 矩阵），权重同时左乘它的转置。比较旋转前后 W4A4 的误差。
 
 ## 自测
 

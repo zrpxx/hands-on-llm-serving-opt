@@ -26,7 +26,7 @@ $A$ 是 $r \times d_{in}$，$B$ 是 $d_{out} \times r$，每个线性层增加 $
 
 如果一个 batch 中所有请求都用同一个适配器，最简单的做法是把 $BA$ 加到 $W$ 上（合并权重），推理时没有任何额外开销。但 Multi-LoRA 的场景下，同一个 batch 中的请求用的是不同的适配器。基座部分 $xW^\top$ 所有请求共用，一次矩阵乘法即可；LoRA 部分每个请求要乘以自己的 $A$、$B$。
 
-逐个请求计算会产生大量的小矩阵乘法，每个都是一次 kernel 调用，3.3 节说过，这类小 kernel 的开销主要在启动，而不在计算。`code/stage4/lora_batch.py` 在 CPU 上比较了几种算法：
+逐个请求计算会产生大量的小矩阵乘法，每个都是一次 kernel 调用，[3.3 节](stage3/03-triton-kernels.md)说过，这类小 kernel 的开销主要在启动，而不在计算。[`code/stage4/lora_batch.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage4/lora_batch.py) 在 CPU 上比较了几种算法：
 
 ```bash
 python code/stage4/lora_batch.py
@@ -44,7 +44,7 @@ LoRA 部分的计算量是基座矩阵乘法的 3.1%
 
 ## 3. 很多个适配器
 
-适配器多到显存放不下时，就要像多模型服务（4.5 节）那样管理一个适配器的缓存：活跃的适配器放在显存中，不活跃的放在 CPU 内存或磁盘上，需要时再加载。原书也是这样描述的：所有活跃的适配器都已加载、随时可用，冷的适配器在需要时从 CPU 内存或磁盘加载。
+适配器多到显存放不下时，就要像多模型服务（[4.5 节](stage4/05-multi-model-serving.md)）那样管理一个适配器的缓存：活跃的适配器放在显存中，不活跃的放在 CPU 内存或磁盘上，需要时再加载。原书也是这样描述的：所有活跃的适配器都已加载、随时可用，冷的适配器在需要时从 CPU 内存或磁盘加载。
 
 适配器的加载比整个模型快得多（几十 MB 对几十 GB），但它和 KV Cache 争夺同一块显存。**S-LoRA** 提出用统一的分页方式（Unified Paging）管理两者：适配器的权重和 KV Cache 都以页为单位存放在同一个内存池中，减少碎片，并配合自定义的 **MBGMM / MBGMV** 算子直接从非连续的分页显存中读取不同秩 $r$ 的适配器权重。论文中一张 GPU 可以服务几千个适配器，吞吐比当时的 vLLM 加 PEFT 的方案高约 4 倍。
 

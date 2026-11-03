@@ -1,6 +1,6 @@
 # 6.9 算子 DSL：TileLang 与 CuTe DSL
 
-> 书外内容。3.3 节用 Triton 写了几个融合算子，项目 3 实现了 RMSNorm、SwiGLU、FlashAttention 等 kernel。本节比较近两年流行的几种 kernel 编程方式。TileLang 和 CuTe DSL 都需要 NVIDIA GPU 才能编译运行，本节的代码只用于阅读。
+> 书外内容。[3.3 节](stage3/03-triton-kernels.md)用 Triton 写了几个融合算子，[项目 3](stage3/boss-kernel-forge.md) 实现了 RMSNorm、SwiGLU、FlashAttention 等 kernel。本节比较近两年流行的几种 kernel 编程方式。TileLang 和 CuTe DSL 都需要 NVIDIA GPU 才能编译运行，本节的代码只用于阅读。
 
 推理引擎的性能最终落在 kernel 上。2024 年以前，写高性能 kernel 基本只有两条路：直接写 CUDA C++（配合 CUTLASS 模板库），或者用 Triton。近两年出现了一批新的选择，DeepSeek 的 DeepInfer 和 V3.2 的稀疏注意力用 TileLang，FlashAttention-4 用 CuTe DSL。它们的出现与硬件的变化直接相关。
 
@@ -30,7 +30,7 @@ Triton 还推出了更底层的 Gluon，让用户直接控制布局和流水线�
 
 ## 3. 读一个 TileLang 的矩阵乘法
 
-下面是 TileLang 中一个标准的矩阵乘法，与 3.3 节 Triton 的写法对照着读：
+下面是 TileLang 中一个标准的矩阵乘法，与 [3.3 节](stage3/03-triton-kernels.md) Triton 的写法对照着读：
 
 ```python
 import tilelang
@@ -93,7 +93,7 @@ def gemm_kernel(gA: cute.Tensor, gB: cute.Tensor, gC: cute.Tensor, mma: cute.Til
 - **注意力、复杂的 MoE、稀疏计算**等需要精细流水线的算子：TileLang 或 CuTe DSL。前者更容易上手，后者控制更细。
 - **矩阵乘法**：优先用现成的库（cuBLAS、CUTLASS、DeepGEMM、FlashInfer）。自己写的 GEMM 很难超过它们。
 
-无论选哪种，3.6 节的方法都适用：先用 Roofline 估算这个算子的上限，再用 Nsight Compute 看实际达到了多少，差距在哪。
+无论选哪种，[3.6 节](stage3/06-profiling.md)的方法都适用：先用 Roofline 估算这个算子的上限，再用 Nsight Compute 看实际达到了多少，差距在哪。
 
 ## 6. 实验
 

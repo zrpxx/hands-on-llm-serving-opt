@@ -16,14 +16,14 @@
 
 | 步骤 | 内容 | 本教程中的相关内容 |
 |---|---|---|
-| 1 | 了解硬件：显存、带宽、计算能力、卡间连接 | 0.5 节 |
-| 2 | 构造有代表性的测试负载 | 0.8 节 |
-| 3 | 定义评测指标 | 0.8 节 |
-| 4 | 启动服务，确认显存和 KV Cache 的分配 | 0.6 节 |
+| 1 | 了解硬件：显存、带宽、计算能力、卡间连接 | [0.5 节](stage0/05-gpu-specs.md) |
+| 2 | 构造有代表性的测试负载 | [0.8 节](stage0/08-metrics.md) |
+| 3 | 定义评测指标 | [0.8 节](stage0/08-metrics.md) |
+| 4 | 启动服务，确认显存和 KV Cache 的分配 | [0.6 节](stage0/06-memory-budget.md) |
 | 5 | 用默认配置压测，建立基线 | |
 | 6 | 换成量化模型，重新压测 | 第 2 部分 |
 | 7 | 针对负载的类型尝试其他优化 | 第 1、3、4 部分 |
-| 8 | 尝试多卡部署 | 4.1 节 |
+| 8 | 尝试多卡部署 | [4.1 节](stage4/01-dp-tp-pp.md) |
 
 ### 步骤 1：硬件
 
@@ -78,13 +78,13 @@ Prefix Repetition 负载（10 个 256 token 的前缀、256 token 的后缀、12
 
 ### 步骤 7：其他优化
 
-接下来按负载类型选择方向：长上下文、prefill 重的负载，考虑 LMCache 跨请求复用 KV（4.4 节）；长输出、decode 重的负载，考虑投机解码（3.4、3.5 节）。最后才是微调引擎参数，如 `--gpu-memory-utilization`、`--max-num-seqs`、`--max-num-batched-tokens`。
+接下来按负载类型选择方向：长上下文、prefill 重的负载，考虑 LMCache 跨请求复用 KV（[4.4 节](stage4/04-advanced-kv-cache.md)）；长输出、decode 重的负载，考虑投机解码（[3.4](stage3/04-speculative-decoding.md)、[3.5](stage3/05-spec-decoding-advanced.md) 节）。最后才是微调引擎参数，如 `--gpu-memory-utilization`、`--max-num-seqs`、`--max-num-batched-tokens`。
 
 切忌**过度调参**：为某一种显卡或单一负载调到极致的参数组合，换一个环境可能表现很差甚至无法运行。现在的推理框架会根据硬件自动推断合理的默认值，大部分精力应该花在"识别瓶颈、选择优化手段"上，而不是手工穷举参数。
 
 ### 步骤 8：多卡
 
-原书在 4 张 L40S（g6e.12xlarge，只有 PCIe）和 8 张 A100（p4d.24xlarge，有 NVLink）上分别测试了 TP = 1、2、4：L40S 上单卡最好，A100 上 4 卡最好。原因正是 4.1 节说的卡间连接。5.2 节会进一步讨论横向与纵向扩展的取舍。
+原书在 4 张 L40S（g6e.12xlarge，只有 PCIe）和 8 张 A100（p4d.24xlarge，有 NVLink）上分别测试了 TP = 1、2、4：L40S 上单卡最好，A100 上 4 卡最好。原因正是 [4.1 节](stage4/01-dp-tp-pp.md)说的卡间连接。[5.2 节](final/02-tradeoffs.md)会进一步讨论横向与纵向扩展的取舍。
 
 ## 3. 重新解读实验结果
 
@@ -94,13 +94,13 @@ Prefix Repetition 负载（10 个 256 token 的前缀、256 token 的后缀、12
 
 原书把 AWQ 的收益归因于两点：KV Cache 变大，允许更大的批处理；以及"减少了 CPU 和 GPU 之间的数据传输"。
 
-第二点在 2.3 节已经订正过：推理时权重一直在显存中，减少的是每一步从显存读权重的字节数。第一点在这个实验中**并不成立**。压测设置了 `--max-concurrency 10`，同时在途的请求最多 10 个，每个约 430 个 token，一共只需要约 4K token 的 KV，远小于默认配置的 72K。KV Cache 从来不是瓶颈，变大也不会让 batch 变大。
+第二点在 [2.3 节](stage2/03-awq.md)已经订正过：推理时权重一直在显存中，减少的是每一步从显存读权重的字节数。第一点在这个实验中**并不成立**。压测设置了 `--max-concurrency 10`，同时在途的请求最多 10 个，每个约 430 个 token，一共只需要约 4K token 的 KV，远小于默认配置的 72K。KV Cache 从来不是瓶颈，变大也不会让 batch 变大。
 
 真正的原因可以用 Little 定律解释：并发固定时，吞吐 = 并发 ÷ 每个请求的耗时。每个请求的耗时主要是 decode，batch 只有 10 时 decode 受限于读权重的带宽：L40S 的带宽是 864 GB/s，读一遍 27.5 GB 的权重要 32 ms，这正是基线 ITL 43 ms 的主要部分；AWQ 的权重只有 9.4 GB，读一遍约 11 ms。ITL 下降，每个请求的耗时下降，吞吐就按同样的比例上升。
 
 <div class="llm-widget" data-widget="littles-law"></div>
 
-两种解释的区别在于它们指向不同的下一步。如果瓶颈是 KV Cache，应该继续压缩 KV、增加显存；如果瓶颈是并发上限，应该先放开 `--max-concurrency`，看系统在更高并发下的表现。原书的实验只测了并发 10 这一个点，没有回答"这张卡最多能承受多少负载"。更完整的做法是 2.7 节第 5 小节的并发扫描。
+两种解释的区别在于它们指向不同的下一步。如果瓶颈是 KV Cache，应该继续压缩 KV、增加显存；如果瓶颈是并发上限，应该先放开 `--max-concurrency`，看系统在更高并发下的表现。原书的实验只测了并发 10 这一个点，没有回答"这张卡最多能承受多少负载"。更完整的做法是 [2.7 节](stage2/07-choosing-quantization.md)第 5 小节的并发扫描。
 
 ### 3.2 前缀重复的负载为什么吞吐更高
 
@@ -116,7 +116,7 @@ Prefix Repetition 负载（10 个 256 token 的前缀、256 token 的后缀、12
 
 - `--max-paddings` 是早期 vLLM 的参数，现在的版本已经没有了，加上会导致启动失败。
 - 示例的启动脚本中写了 `--max-num-seqs 8` 和 `--max-model-len 1024`：前者让 batch 最多只有 8 个请求，与"提高吞吐"的目标相反；后者小于 ShareGPT 中部分请求的输入加输出长度，这些请求会被拒绝。它们只能作为参数写法的示意，不是推荐的配置。
-- `--quantization awq` 会强制使用较慢的老 kernel（2.3 节），`--enable-prefix-caching` 和 `--enable-chunked-prefill` 在 vLLM V1 中已经默认开启。
+- `--quantization awq` 会强制使用较慢的老 kernel（[2.3 节](stage2/03-awq.md)），`--enable-prefix-caching` 和 `--enable-chunked-prefill` 在 vLLM V1 中已经默认开启。
 
 ## 4. 一份检查清单
 
@@ -124,12 +124,12 @@ Prefix Repetition 负载（10 个 256 token 的前缀、256 token 的后缀、12
 
 1. **定目标**：吞吐优先还是延迟优先？SLO 是多少（TTFT、ITL 的 P99）？
 2. **画像负载**：输入、输出长度的分布，前缀重复的程度，并发的范围。用真实的数据或者最接近的公开数据集。
-3. **估算上限**：用 0.6、0.7 节的方法估算显存分配和带宽上限，心里先有一个"理论上能到多少"的数字。
+3. **估算上限**：用 [0.6](stage0/06-memory-budget.md)、[0.7](stage0/07-roofline.md) 节的方法估算显存分配和带宽上限，心里先有一个"理论上能到多少"的数字。
 4. **测基线**：默认配置，做并发扫描，记录吞吐、TTFT、ITL 随并发的曲线，找到满足 SLO 的最大并发。
-5. **找瓶颈**：KV Cache 满了？decode 受限于带宽？prefill 拖慢了 decode？CPU 开销？用 3.6 节的方法确认。
-6. **对症下药**：权重或 KV 太大，量化（第 2 部分）；prefill 干扰 decode，调 chunked prefill 或 PD 分离（1.2、4.3 节）；前缀重复多，确认缓存命中和路由（1.4、4.6 节）；输出长、并发低，投机解码（3.4 节）；模型放不下或延迟不够，多卡（4.1 节）。
+5. **找瓶颈**：KV Cache 满了？decode 受限于带宽？prefill 拖慢了 decode？CPU 开销？用 [3.6 节](stage3/06-profiling.md)的方法确认。
+6. **对症下药**：权重或 KV 太大，量化（第 2 部分）；prefill 干扰 decode，调 chunked prefill 或 PD 分离（[1.2](stage1/02-continuous-batching.md)、[4.3](stage4/03-pd-disaggregation.md) 节）；前缀重复多，确认缓存命中和路由（[1.4](stage1/04-prefix-caching.md)、[4.6](stage4/06-load-balancing-routing.md) 节）；输出长、并发低，投机解码（[3.4 节](stage3/04-speculative-decoding.md)）；模型放不下或延迟不够，多卡（[4.1 节](stage4/01-dp-tp-pp.md)）。
 7. **一次只改一处**，每次都在同一个负载下重新做并发扫描，和基线比较。
-8. **验证精度**：量化、投机解码等改动后，确认质量没有退化（2.7 节）。
+8. **验证精度**：量化、投机解码等改动后，确认质量没有退化（[2.7 节](stage2/07-choosing-quantization.md)）。
 9. **适可而止**：收益低于测量误差、或者配置开始变得脆弱时，停下来。
 
 ## 5. 实验

@@ -1,8 +1,8 @@
 # 6.8 异步调度
 
-> 书外内容。原书第 10 章介绍了 vLLM V1 把预处理放到单独进程的做法（5.4 节），3.6 节用性能剖析观察过 CPU 开销。本节讨论更进一步的异步调度。模拟实验和组件是书外内容。
+> 书外内容。原书第 10 章介绍了 vLLM V1 把预处理放到单独进程的做法（[5.4 节](final/04-multimodal-serving.md)），[3.6 节](stage3/06-profiling.md)用性能剖析观察过 CPU 开销。本节讨论更进一步的异步调度。模拟实验和组件是书外内容。
 
-3.6 节和项目 1 都观察到：模型越小、GPU 越快，decode 的每一步中 CPU 的开销占比越高。SGLang 的博客引用过一个估计：没有优化的推理引擎，可能有一半的时间花在 CPU 上。CUDA Graph 消除了 kernel 发射的开销（3.6 节），但每一步还有一段 CPU 工作无法放进 CUDA Graph：
+[3.6 节](stage3/06-profiling.md)和项目 1 都观察到：模型越小、GPU 越快，decode 的每一步中 CPU 的开销占比越高。SGLang 的博客引用过一个估计：没有优化的推理引擎，可能有一半的时间花在 CPU 上。CUDA Graph 消除了 kernel 发射的开销（[3.6 节](stage3/06-profiling.md)），但每一步还有一段 CPU 工作无法放进 CUDA Graph：
 
 - **调度**：选出这一步参与的请求，分配 KV 块，前缀缓存的匹配；
 - **准备输入**：构造 `input_ids`、`positions`、block table 等张量，拷到 GPU；
@@ -16,7 +16,7 @@
 
 <div class="llm-widget" data-widget="async-timeline"></div>
 
-稳定之后，每一步的耗时从"CPU + GPU"变成了二者中较大的那个。`code/stage6/async_sched.py` 用一个线程模拟 GPU（`sleep` 时释放 GIL，与真实的 GPU 一样可以和 CPU 并行），验证了这一点：
+稳定之后，每一步的耗时从"CPU + GPU"变成了二者中较大的那个。[`code/stage6/async_sched.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage6/async_sched.py) 用一个线程模拟 GPU（`sleep` 时释放 GIL，与真实的 GPU 一样可以和 CPU 并行），验证了这一点：
 
 ```bash
 python code/stage6/async_sched.py
@@ -59,14 +59,14 @@ vLLM 2026 年的 Model Runner V2 进一步把输入的准备搬到了 GPU 上：
 
 - 把输入的准备搬到 GPU 上（Model Runner V2）；
 - 用更高效的数据结构，避免每步重建 Python 对象；
-- 把 detokenize 和网络发送放到另一个进程（vLLM V1 的进程分离，5.4 节）；
+- 把 detokenize 和网络发送放到另一个进程（vLLM V1 的进程分离，[5.4 节](final/04-multimodal-serving.md)）；
 - 减少多卡之间的同步。vLLM 在 DeepSeek-V4.1-Flash 的部署中，把每步 DP 同步用的 CPU all-reduce 从 10.8 ms 降到 1.5 ms，每步耗时从 16.1 ms 降到 13.2 ms。
 
 ## 5. 实验
 
 - **CPU**：运行 `async_sched.py --gpu-ms 2`，异步还有多少收益？再运行 `--requests 64 --max-batch 64`，多算的 token 占比是多少？
 - **CPU**：在项目 1 的 MiniServe 中，用 `time.perf_counter` 测出一个 decode 步中调度、准备输入、前向、后处理各自的耗时。哪些部分可以与前向重叠？
-- **GPU**：用 vLLM 部署 Qwen3-0.6B，在并发 64 下比较开关 `--no-async-scheduling` 的 TPOT 和吞吐；再用 Nsight Systems 观察两种情况下 GPU 时间线上的空隙（3.6 节）。
+- **GPU**：用 vLLM 部署 Qwen3-0.6B，在并发 64 下比较开关 `--no-async-scheduling` 的 TPOT 和吞吐；再用 Nsight Systems 观察两种情况下 GPU 时间线上的空隙（[3.6 节](stage3/06-profiling.md)）。
 
 ## 自测
 

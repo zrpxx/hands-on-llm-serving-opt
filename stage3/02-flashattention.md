@@ -100,7 +100,7 @@ $$
 
 论文报告长序列 decode 时最多快 8 倍。vLLM、SGLang 的 decode kernel 都采用了这种切分。
 
-decode 还要处理分页的 KV Cache（1.3 节）：一个请求的 KV 分散在不连续的物理块里，kernel 按块表找到每一块的位置。项目 3 的第 5 步就是写这样一个 kernel，它和项目 1 的 KV 布局相同。
+decode 还要处理分页的 KV Cache（[1.3 节](stage1/03-paged-attention-vllm.md)）：一个请求的 KV 分散在不连续的物理块里，kernel 按块表找到每一块的位置。[项目 3](stage3/boss-kernel-forge.md) 的第 5 步就是写这样一个 kernel，它和项目 1 的 KV 布局相同。
 
 ## 6. 推理引擎中的注意力后端
 
@@ -124,7 +124,7 @@ SGLang 使用 `--attention-backend` 参数。不同版本的可选值和默认�
 
 ## 7. 实验
 
-读完 3.3 节了解 Triton 的基本语法后，可以完成项目 3 的第 3～5 步：它们分别实现在线 softmax、FlashAttention 的前向和分页的 decode 注意力。在安装了 Triton 的环境中，三者都可以在 CPU 上用解释器运行和测试：
+读完 [3.3 节](stage3/03-triton-kernels.md)了解 Triton 的基本语法后，可以完成项目 3 的第 3～5 步：它们分别实现在线 softmax、FlashAttention 的前向和分页的 decode 注意力。在安装了 Triton 的环境中，三者都可以在 CPU 上用解释器运行和测试：
 
 ```bash
 cd code/project3

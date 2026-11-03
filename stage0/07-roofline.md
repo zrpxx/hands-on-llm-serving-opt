@@ -2,7 +2,7 @@
 
 > 对应原书第 5 章 *Bottlenecks in LLM Model Execution*。
 
-0.4 节说 prefill 受算力限制、decode 受显存带宽限制，0.5 节也用这个结论比较了不同的 GPU。这一节把它说清楚：用算术强度刻画一个计算"每读一个字节做多少运算"，用 Roofline 模型判断它会被哪种资源卡住，最后得到两个简单的估算公式，算出 decode 和 prefill 的延迟下限。
+[0.4 节](stage0/04-kv-cache-prefill-decode.md)说 prefill 受算力限制、decode 受显存带宽限制，[0.5 节](stage0/05-gpu-specs.md)也用这个结论比较了不同的 GPU。这一节把它说清楚：用算术强度刻画一个计算"每读一个字节做多少运算"，用 Roofline 模型判断它会被哪种资源卡住，最后得到两个简单的估算公式，算出 decode 和 prefill 的延迟下限。
 
 ## 1. 同一个模型，GPU 的利用率差几十倍
 
@@ -135,9 +135,9 @@ $$
 
 批处理只对线性层有效。线性层里，所有请求共用同一份权重；注意力层里，每个请求读的是自己的 KV Cache，没有任何共享。
 
-对一个请求，当前 token 的 $q$ 和缓存里 $T$ 个位置的 $k$、$v$ 计算注意力：每层浮点运算约为 $4 n_q d_h T$ 次（0.2 节），读取的 KV 字节数为 $2 \times n_{kv} d_h T \times 2 = 4 n_{kv} d_h T$（0.6 节）。两者相除，$T$ 与 $4 d_h$ 恰好约掉，算术强度就等于 GQA 的分组数 $n_q / n_{kv}$：MHA 是 1，Qwen3-8B 是 4。不管批多大，这一部分始终处在访存受限区。
+对一个请求，当前 token 的 $q$ 和缓存里 $T$ 个位置的 $k$、$v$ 计算注意力：每层浮点运算约为 $4 n_q d_h T$ 次（[0.2 节](stage0/02-transformer-anatomy.md)），读取的 KV 字节数为 $2 \times n_{kv} d_h T \times 2 = 4 n_{kv} d_h T$（[0.6 节](stage0/06-memory-budget.md)）。两者相除，$T$ 与 $4 d_h$ 恰好约掉，算术强度就等于 GQA 的分组数 $n_q / n_{kv}$：MHA 是 1，Qwen3-8B 是 4。不管批多大，这一部分始终处在访存受限区。
 
-所以长上下文、大批量时，decode 每一步的时间越来越多地花在读 KV Cache 上，而不是读权重。这也是 KV Cache 量化（2.5 节）和 MLA 等注意力结构（3.1 节）重要的原因。
+所以长上下文、大批量时，decode 每一步的时间越来越多地花在读 KV Cache 上，而不是读权重。这也是 KV Cache 量化（[2.5 节](stage2/05-kv-cache-quant.md)）和 MLA 等注意力结构（[3.1 节](stage3/01-attention-variants.md)）重要的原因。
 
 下面的组件画出了一张 GPU 的 Roofline，以及三类计算的位置。拖动批大小和输入长度，观察它们怎样移动。
 

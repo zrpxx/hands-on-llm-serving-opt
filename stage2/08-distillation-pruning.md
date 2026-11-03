@@ -42,7 +42,7 @@
 
 工程上一般从简单、便宜的办法开始：如果有现成的蒸馏模型，先评测它是否满足精度要求，满足就用它，还可以在它的基础上再做量化；没有现成的蒸馏模型时（实际中大多如此），先做量化。
 
-还有一种和服务直接相关的蒸馏：为投机解码训练草稿模型。EAGLE 等方法训练一个很小的草稿头来预测目标模型的下一个 token，本质上也是让小模型模仿大模型的输出分布。3.4、3.5 节会详细讨论。
+还有一种和服务直接相关的蒸馏：为投机解码训练草稿模型。EAGLE 等方法训练一个很小的草稿头来预测目标模型的下一个 token，本质上也是让小模型模仿大模型的输出分布。[3.4](stage3/04-speculative-decoding.md)、[3.5](stage3/05-spec-decoding-advanced.md) 节会详细讨论。
 
 ## 2. 剪枝
 
@@ -113,7 +113,7 @@ python tools/prune_24.py --model /tmp/tiny-lm --data data
 ## 延伸阅读
 
 - Hinton et al., [Distilling the Knowledge in a Neural Network](https://arxiv.org/abs/1503.02531), 2015。
-- DeepSeek-AI, [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://arxiv.org/abs/2501.12948), 2025，第 2.4 节蒸馏。
+- DeepSeek-AI, [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://arxiv.org/abs/2501.12948), 2025，第 [2.4 节](stage2/04-activation-quant.md)蒸馏。
 - Frantar & Alistarh, [SparseGPT: Massive Language Models Can Be Accurately Pruned in One-Shot](https://arxiv.org/abs/2301.00774), ICML 2023。
 - Sun et al., [A Simple and Effective Pruning Approach for Large Language Models](https://arxiv.org/abs/2306.11695)（Wanda），ICLR 2024。
 - Muralidharan et al., [Compact Language Models via Pruning and Knowledge Distillation](https://arxiv.org/abs/2407.14679)（Minitron），NeurIPS 2024。

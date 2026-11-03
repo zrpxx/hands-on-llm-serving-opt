@@ -10,7 +10,7 @@
 
 | 层次 | 看什么 | 工具 |
 |---|---|---|
-| 服务层 | 吞吐、TTFT、ITL、GPU 利用率、显存占用 | 压测工具（0.8 节）、vLLM 的 `/metrics` |
+| 服务层 | 吞吐、TTFT、ITL、GPU 利用率、显存占用 | 压测工具（[0.8 节](stage0/08-metrics.md)）、vLLM 的 `/metrics` |
 | 框架层 | 每个 PyTorch 算子的耗时，CPU 与 GPU 之间的数据传输，计算与 I/O 是否重叠 | PyTorch Profiler |
 | 运行时层 | 每个 CUDA kernel 的执行情况，kernel 之间的空隙，kernel 内部的瓶颈 | Nsight Systems、Nsight Compute |
 
@@ -49,11 +49,11 @@ decode 时最常见的瓶颈不在 GPU 上。每生成一个 token，模型要�
 
 用 `--enforce-eager` 启动 vLLM 可以关闭 CUDA Graph 和编译，在调试时很有用，也可以用来体会它的作用。
 
-除了 CUDA Graph，降低 CPU 开销的手段还有：把调度、输入准备与 GPU 执行重叠起来（6.8 节的异步调度），以及把预处理、分词、反分词放到单独的进程中。原书提到，vLLM V1 把 API 服务、输入预处理与 GPU 执行拆到不同的进程，就是为了避免多模态预处理这类 CPU 密集的工作阻塞 kernel 的发射。
+除了 CUDA Graph，降低 CPU 开销的手段还有：把调度、输入准备与 GPU 执行重叠起来（[6.8 节](stage6/08-async-scheduling.md)的异步调度），以及把预处理、分词、反分词放到单独的进程中。原书提到，vLLM V1 把 API 服务、输入预处理与 GPU 执行拆到不同的进程，就是为了避免多模态预处理这类 CPU 密集的工作阻塞 kernel 的发射。
 
 ## 4. PyTorch Profiler
 
-`code/stage3/profile_decode.py` 用 PyTorch Profiler 剖析 Hugging Face 模型的 decode。不指定模型时，它会生成一个 8 层的随机小模型，在 CPU 上就能运行：
+[`code/stage3/profile_decode.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage3/profile_decode.py) 用 PyTorch Profiler 剖析 Hugging Face 模型的 decode。不指定模型时，它会生成一个 8 层的随机小模型，在 CPU 上就能运行：
 
 ```bash
 python code/stage3/profile_decode.py
@@ -91,7 +91,7 @@ aten::scaled_dot_product_attention  0.37%   3.184ms           64
 
 - **一个 8 层的模型，每一步有两千多次算子调用。** 平均每层两百多次，大部分是 `transpose`、`view`、`to` 这样的小操作。每一次都要经过 Python 和 PyTorch 的分派。
 - **`decode_step` 自身占了 24% 的时间**，这是不在任何 aten 算子里的部分，主要是 Hugging Face 模型代码本身的 Python 开销。
-- **`aten::cat` 有 264 次。** 一半来自 RoPE 的 `rotate_half`，另一半来自 `DynamicCache`：它每一步用 `torch.cat` 把新的 K、V 拼到旧的缓存后面，也就是把整个缓存复制一遍。上下文越长，这一步越慢。这正是 1.3 节分页 KV Cache 要避免的问题。
+- **`aten::cat` 有 264 次。** 一半来自 RoPE 的 `rotate_half`，另一半来自 `DynamicCache`：它每一步用 `torch.cat` 把新的 K、V 拼到旧的缓存后面，也就是把整个缓存复制一遍。上下文越长，这一步越慢。这正是 [1.3 节](stage1/03-paged-attention-vllm.md)分页 KV Cache 要避免的问题。
 
 在 GPU 上运行时（`--model Qwen/Qwen3-0.6B --device cuda`），表里会多出 CUDA 时间一列。对比"CPU total"和"CUDA total"，如果后者远小于前者，就说明瓶颈在 CPU 上。
 
@@ -123,7 +123,7 @@ vLLM 会启动子进程，`--trace-fork-before-exec` 让 `nsys` 跟踪到这些�
 |---|---|---|
 | kernel 之间有规律的空隙 | CPU 发射跟不上 | CUDA Graph、减少小算子、异步调度 |
 | 每一步开头有一段较长的空白 | 调度和输入准备在关键路径上 | 把准备工作与 GPU 执行重叠 |
-| 大量很短的 kernel | 没有融合 | 融合算子（3.3 节）、`torch.compile` |
+| 大量很短的 kernel | 没有融合 | 融合算子（[3.3 节](stage3/03-triton-kernels.md)）、`torch.compile` |
 | 内存拷贝与计算串行 | 拷贝没有放到单独的 stream | 原书建议用多个 CUDA stream 让拷贝与计算重叠 |
 | 多卡时 NCCL 的 kernel 很长 | 通信没有与计算重叠，或者链路带宽不够 | 第 4 部分 |
 

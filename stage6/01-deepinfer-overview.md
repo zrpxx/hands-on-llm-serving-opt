@@ -34,9 +34,9 @@ DeepInfer 的很多设计是为模型服务的，所以先了解一下 V4.1-Flas
 
 - **编码器与解码器分开**：40 层被分为前 20 层和后 20 层（前后两部分均使用因果掩码，与 YOCO 论文中的 Self-Decoder + Cross-Decoder 结构相近）。前一半处理输入并生成全局的 KV；后一半直接通过交叉注意力复用这份全局 KV，不再为整个输入建立自己的全局状态。
 - **滑动窗口 + 稀疏索引**：每一层都有一个最近 128 个 token 的滑动窗口；窗口之外的上下文，通过一个稀疏索引选出相关的位置。
-- **极小的 KV**：全局 KV 以 FP4 存储，加上跨层共享，每个 token 只有约 890 字节。作为对比，DeepSeek-V3 的 MLA 每个 token 约 69 KB（6.6 节）。
+- **极小的 KV**：全局 KV 以 FP4 存储，加上跨层共享，每个 token 只有约 890 字节。作为对比，DeepSeek-V3 的 MLA 每个 token 约 69 KB（[6.6 节](stage6/06-long-context.md)）。
 - **MoE**：384 个路由专家，每个 token 选 6 个。
-- **DSpark 投机解码**：取代了之前的 MTP 模块，一次前向预测之后 5 个位置，并给出置信度（6.5 节）。
+- **DSpark 投机解码**：取代了之前的 MTP 模块，一次前向预测之后 5 个位置，并给出置信度（[6.5 节](stage6/05-mtp-speculative.md)）。
 
 ## 4. 值得重点看的五个机制
 
@@ -48,7 +48,7 @@ DeepInfer 的很多设计是为模型服务的，所以先了解一下 V4.1-Flas
 | **批不变与确定性采样** | `DEEPINFER_BATCH_INVARIANT=1` 保证不同的批组合下结果相同；再关闭投机解码、固定 `seq_seed`，可以得到确定性的采样（仅 NVIDIA） | 5.6 → [6.7](stage6/07-batch-invariance.md) |
 | **EP + EPLB** | MoE 专家并行，配合专家负载均衡 | 4.2 → [6.3](stage6/03-wide-ep-eplb.md) |
 
-另外它支持 regex、JSON Schema、EBNF 三种结构化输出的约束（5.7 节）。
+另外它支持 regex、JSON Schema、EBNF 三种结构化输出的约束（[5.7 节](final/07-agentic-serving.md)）。
 
 **SWA bounded replay** 值得多说一句，它是模型结构和推理引擎配合的一个好例子。解码器部分不建立全局 KV，只需要滑动窗口内的状态。所以 prefill 时，解码器的 20 层根本不必处理整个输入，只要把最后一段送进去即可，长度要覆盖 128 个 token 的滑动窗口，再加上投机解码验证回退所需的最大回溯余量（12 个 token，合计保留 140 个 token）。输入有几万个 token 时，模型一半的层只算了最后 140 个。vLLM 实现同样的优化后，32K 输入的 prefill 吞吐提高了约 20%。
 
@@ -60,7 +60,7 @@ README 写明以下内容不在本次发布的范围内：
 - Prefill-Decode 分离（README 说引擎一侧需要的功能大部分已经具备）；
 - 数据并行副本之间的负载均衡。
 
-也就是说，4.3 节的 PD 分离、4.4 节的 KV 分层存储、4.6 节的路由，在 DeepInfer 里都看不到实现。这几部分要回到 vLLM、SGLang、Mooncake、LMCache 去看。
+也就是说，[4.3 节](stage4/03-pd-disaggregation.md)的 PD 分离、[4.4 节](stage4/04-advanced-kv-cache.md)的 KV 分层存储、[4.6 节](stage4/06-load-balancing-routing.md)的路由，在 DeepInfer 里都看不到实现。这几部分要回到 vLLM、SGLang、Mooncake、LMCache 去看。
 
 ## 6. 建议的阅读顺序
 
@@ -70,7 +70,7 @@ README 写明以下内容不在本次发布的范围内：
 2. 顺着主路径读调度器，重点看异步调度怎样把 CPU 的工作和 GPU 的执行错开。与 vLLM 的 `Scheduler` 和 `GPUModelRunner` 对照着读。
 3. 读投机解码的起草与验证循环，看置信度怎样决定验证多少个草稿。
 4. 读 MoE 层的前向，看 DeepEP 的 dispatch、combine 和 EPLB 的冗余专家怎样接进来。
-5. 最后看 `csrc/` 和 TileLang 算子，挑一个和 FlashMLA 或 DeepGEMM 对照（6.9 节）。
+5. 最后看 `csrc/` 和 TileLang 算子，挑一个和 FlashMLA 或 DeepGEMM 对照（[6.9 节](stage6/09-kernel-dsl.md)）。
 
 每读一部分，记下一句话：**这里和 vLLM 的做法有什么不同，为什么**。
 

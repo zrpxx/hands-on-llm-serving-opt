@@ -6,7 +6,7 @@
 
 ## 1. 收益随 batch 怎样变化
 
-先用 Roofline 模型（0.7 节）估算一下。线性层的计算量是 $2 \times \text{参数量} \times \text{token 数}$，读权重的字节数与 token 数无关。token 数少时，耗时由读权重决定，权重越小越快；token 数多时，耗时由计算决定，只有更快的 Tensor Core 才有帮助。
+先用 Roofline 模型（[0.7 节](stage0/07-roofline.md)）估算一下。线性层的计算量是 $2 \times \text{参数量} \times \text{token 数}$，读权重的字节数与 token 数无关。token 数少时，耗时由读权重决定，权重越小越快；token 数多时，耗时由计算决定，只有更快的 Tensor Core 才有帮助。
 
 <div class="llm-widget" data-widget="lowbit-gemm"></div>
 
@@ -16,9 +16,9 @@
 
 ## 2. INT4 权重怎样存放
 
-GPU 没有 4 位的数据类型，最小的内存访问单位是字节。所以 4 位的权重要打包：8 个 4 位整数放进一个 32 位整数。GPTQ 格式的 checkpoint 里，`qweight` 就是这样打包的 int32 张量，另外还有每组的 `scales` 和 `qzeros`（2.2 节）。
+GPU 没有 4 位的数据类型，最小的内存访问单位是字节。所以 4 位的权重要打包：8 个 4 位整数放进一个 32 位整数。GPTQ 格式的 checkpoint 里，`qweight` 就是这样打包的 int32 张量，另外还有每组的 `scales` 和 `qzeros`（[2.2 节](stage2/02-gptq.md)）。
 
-`code/project2/tools/int4_pack.py` 演示了打包和解包：
+[`code/project2/tools/int4_pack.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/project2/tools/int4_pack.py) 演示了打包和解包：
 
 ```bash
 cd code/project2
@@ -65,7 +65,7 @@ vLLM 启动时会打印选用的 kernel，例如 `Using MarlinLinearKernel` 或 
 
 ## 4. W8A8：scale 放在哪里
 
-2.4 节说过，W8A8 的 scale 只能放在求和之外的维度上：
+[2.4 节](stage2/04-activation-quant.md)说过，W8A8 的 scale 只能放在求和之外的维度上：
 
 $$
 Y = \text{diag}(\Delta^X) \left( \hat{X} \hat{W}^\top \right) \text{diag}(\Delta^W)
@@ -73,7 +73,7 @@ $$
 
 括号里是纯粹的 INT8 或 FP8 矩阵乘法，结果累加在 INT32 或 FP32 中；乘 scale 放在 kernel 的**收尾阶段**（epilogue），也就是累加结束、写回显存之前，对每个输出元素乘以所在行的 $\Delta^X_i$ 和所在列的 $\Delta^W_k$。这一步只有逐元素的乘法，几乎没有开销。vLLM 的 `cutlass_scaled_mm` 就是这样实现的，支持按张量、按 token、按通道的各种组合。
 
-按块的 FP8（DeepSeek-V3 的方案，2.4 节）稍复杂一些：每 128 个求和元素就换一组 scale，所以不能只在收尾时乘一次，需要每算完一个 128 的块，就把部分和乘上这一块的 scale，再加到 FP32 的累加器上。DeepSeek 开源的 DeepGEMM 实现了这种 kernel。
+按块的 FP8（DeepSeek-V3 的方案，[2.4 节](stage2/04-activation-quant.md)）稍复杂一些：每 128 个求和元素就换一组 scale，所以不能只在收尾时乘一次，需要每算完一个 128 的块，就把部分和乘上这一块的 scale，再加到 FP32 的累加器上。DeepSeek 开源的 DeepGEMM 实现了这种 kernel。
 
 DeepSeek-V3 的技术报告还提到一个细节：H800 上 FP8 Tensor Core 内部累加的精度只有约 14 位，求和维度很长时误差会累积。他们的做法是每 128 个元素把部分和提升到 FP32 累加器中，按块的 scale 正好在这一步一起处理。
 
@@ -96,4 +96,4 @@ DeepSeek-V3 的技术报告还提到一个细节：H800 上 FP8 Tensor Core 内�
 
 - Frantar et al., [MARLIN: Mixed-Precision Auto-Regressive Parallel Inference on Large Language Models](https://arxiv.org/abs/2408.11743), PPoPP 2025，以及 [代码](https://github.com/IST-DASLab/marlin)。
 - [Introducing Machete, a mixed-input GEMM kernel optimized for NVIDIA Hopper GPUs](https://developers.redhat.com/articles/2024/10/14/introducing-machete-mixed-input-gemm-kernel)，Red Hat 开发者博客，2024。
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 3.3 节 FP8 训练，以及 [DeepGEMM](https://github.com/deepseek-ai/DeepGEMM)。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 [3.3 节](stage3/03-triton-kernels.md) FP8 训练，以及 [DeepGEMM](https://github.com/deepseek-ai/DeepGEMM)。

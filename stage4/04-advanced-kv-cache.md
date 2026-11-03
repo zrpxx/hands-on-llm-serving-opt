@@ -2,7 +2,7 @@
 
 > 对应原书第 7 章 *Advanced KV Caching*。KV 传输与加载的带宽估算是书外内容。
 
-1.4 节的前缀缓存把算好的 KV 留在显存里，下次遇到相同的前缀直接复用。但显存很小：一张 H100 放完 Qwen3-8B 的权重，剩下的空间只够存三十多万个 token 的 KV。当应用需要反复使用很长的上下文，比如整个代码仓库、一个客户的全部文档、几十轮的对话历史，显存就不够用了。
+[1.4 节](stage1/04-prefix-caching.md)的前缀缓存把算好的 KV 留在显存里，下次遇到相同的前缀直接复用。但显存很小：一张 H100 放完 Qwen3-8B 的权重，剩下的空间只够存三十多万个 token 的 KV。当应用需要反复使用很长的上下文，比如整个代码仓库、一个客户的全部文档、几十轮的对话历史，显存就不够用了。
 
 这一节讨论两个问题：长上下文的应用在成本和延迟上怎样权衡；KV Cache 放不下显存时，怎样把它存到 CPU 内存、SSD 甚至远端，需要时再取回来。
 
@@ -67,7 +67,7 @@ $$
 
 ### 2.1 重算还是加载
 
-把 KV 从下一层存储读回来，比重新 prefill 快吗？先用 Qwen3-8B 和 H100 手算一下：每个 token 的 KV 是 144 KiB（0.6 节），经 PCIe 5.0（约 50 GB/s）从 CPU 内存读回一个 token 的 KV 约需 $144\text{ KiB} / 50\text{ GB/s} \approx 2.9\ \mu\text{s}$；而在 H100 上重算一个 token 的线性层（按 60% MFU 计）就需要 $2 \times 7.6\text{B} / (989\text{ TFLOPS} \times 0.6) \approx 25.6\ \mu\text{s}$，这还没算随长度平方增长的自注意力。只要能跑满 PCIe 带宽，从 CPU 内存加载就比重算快得多；换成只有几 GB/s 的 SSD 或慢速网络时，结果就取决于前缀的长度和存储带宽：
+把 KV 从下一层存储读回来，比重新 prefill 快吗？先用 Qwen3-8B 和 H100 手算一下：每个 token 的 KV 是 144 KiB（[0.6 节](stage0/06-memory-budget.md)），经 PCIe 5.0（约 50 GB/s）从 CPU 内存读回一个 token 的 KV 约需 $144\text{ KiB} / 50\text{ GB/s} \approx 2.9\ \mu\text{s}$；而在 H100 上重算一个 token 的线性层（按 60% MFU 计）就需要 $2 \times 7.6\text{B} / (989\text{ TFLOPS} \times 0.6) \approx 25.6\ \mu\text{s}$，这还没算随长度平方增长的自注意力。只要能跑满 PCIe 带宽，从 CPU 内存加载就比重算快得多；换成只有几 GB/s 的 SSD 或慢速网络时，结果就取决于前缀的长度和存储带宽：
 
 <div class="llm-widget" data-widget="kv-tier"></div>
 
@@ -117,11 +117,11 @@ CacheBlend 的做法是：拼接各段缓存的 KV，再挑出一小部分 token
 
 上面讨论的是"把 KV 存在哪里"。单个请求的上下文本身就很长时（几十万到上百万 token），还要考虑怎样在显存中处理它：
 
-- KV Cache 量化（2.5 节）和 MLA、滑动窗口等结构（3.1 节）减小每个 token 的 KV；
+- KV Cache 量化（[2.5 节](stage2/05-kv-cache-quant.md)）和 MLA、滑动窗口等结构（[3.1 节](stage3/01-attention-variants.md)）减小每个 token 的 KV；
 - 稀疏注意力只计算一部分 token 之间的注意力；
 - Context Parallelism 把一个长序列切到多张卡上计算。
 
-6.6 节会讨论后两者。
+[6.6 节](stage6/06-long-context.md)会讨论后两者。
 
 ## 5. 实验
 

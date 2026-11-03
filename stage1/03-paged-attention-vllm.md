@@ -16,7 +16,7 @@ PyTorch 的张量要求占用一段连续的显存。早期的推理系统因此
 | 内部碎片 | 请求在第 50 个 token 就结束了，预留的其余位置从头到尾没有用过 |
 | 外部碎片 | 大小不一的连续块反复分配、释放之后，显存里留下许多零散的空隙，加起来够用，但拼不出一段足够长的连续空间 |
 
-vLLM 论文测量了当时的几个系统：KV Cache 显存中真正存放了有效数据的只有 20.4%～38.2%，六成以上被浪费。0.6 节算出一张卡能并发 88 个请求，前提是每个请求都用满最大长度；连续分配的问题恰好相反，它让每个请求无论实际多长，都占用最大长度的空间。
+vLLM 论文测量了当时的几个系统：KV Cache 显存中真正存放了有效数据的只有 20.4%～38.2%，六成以上被浪费。[0.6 节](stage0/06-memory-budget.md)算出一张卡能并发 88 个请求，前提是每个请求都用满最大长度；连续分配的问题恰好相反，它让每个请求无论实际多长，都占用最大长度的空间。
 
 ## 2. PagedAttention
 
@@ -74,7 +74,7 @@ $$
 
 举个例子：$B = 4$，序列 A 的块表是 `[1, 4, 7]`，要写入位置 5 的 K、V。位置 5 属于逻辑块 $5 \div 4 = 1$（取整），对应物理块 4；块内偏移 $5 \bmod 4 = 1$。所以槽位是 $4 \times 4 + 1 = 17$。
 
-如果把 KV Cache 存成一个 `[num_blocks × B, n_kv, d_h]` 的大张量，槽位就是第一维的下标，写入和读取都可以用一次高级索引完成。项目 1 的 MiniServe 就是这样存的，`_prepare_inputs()` 的主要工作之一就是为这一步的每个 token 算出槽位。
+如果把 KV Cache 存成一个 `[num_blocks × B, n_kv, d_h]` 的大张量，槽位就是第一维的下标，写入和读取都可以用一次高级索引完成。[项目 1](stage1/boss-miniserve.md) 的 MiniServe 就是这样存的，`_prepare_inputs()` 的主要工作之一就是为这一步的每个 token 算出槽位。
 
 下面的组件逐步模拟一个只有 8 个物理块（块大小为 4）的池子。三个序列先后到达，不断增长，直到块不够用时发生抢占。
 
@@ -108,9 +108,9 @@ flowchart LR
   EC --> O["输出处理<br/>增量解码、流式返回"]
 ```
 
-API 服务和输入、输出处理运行在一个进程里，EngineCore 运行在另一个进程里，两者通过 ZeroMQ 通信（1.1 节）。
+API 服务和输入、输出处理运行在一个进程里，EngineCore 运行在另一个进程里，两者通过 ZeroMQ 通信（[1.1 节](stage1/01-serving-from-scratch.md)）。
 
-**显存测算。** 0.6 节提到，vLLM 启动时不估计激活要占多少显存，而是实际跑一次：加载权重后，构造一个 token 数达到 `max_num_batched_tokens` 的假输入，执行一次前向，记录显存峰值。然后用 $\text{总显存} \times$ `gpu_memory_utilization` $-$ 权重 $-$ 峰值激活，把剩下的空间全部切成 KV 块。MiniServe 的 `_profile_num_blocks` 做的是同样的事。
+**显存测算。** [0.6 节](stage0/06-memory-budget.md)提到，vLLM 启动时不估计激活要占多少显存，而是实际跑一次：加载权重后，构造一个 token 数达到 `max_num_batched_tokens` 的假输入，执行一次前向，记录显存峰值。然后用 $\text{总显存} \times$ `gpu_memory_utilization` $-$ 权重 $-$ 峰值激活，把剩下的空间全部切成 KV 块。MiniServe 的 `_profile_num_blocks` 做的是同样的事。
 
 > [!NOTE]
 > 原书第 8 章介绍模型加载时，说 `Qwen2.5-7B` 会匹配到 `Qwen3NextForCausalLM`，示例代码中还用了 `Qwen/Qwen3-7B-Instruct`。实际上，Qwen2.5 的 `config.json` 里 `architectures` 是 `Qwen2ForCausalLM`；Qwen3 的稠密模型只有 0.6B、1.7B、4B、8B、14B、32B 几种尺寸，没有 7B。读源码或做实验时，以模型仓库中的 `config.json` 为准。

@@ -16,7 +16,7 @@ def generate(req: Request):
 
 一个人用的时候没有问题，多人同时使用就不行了：
 
-- 请求一个接一个地处理，每次批大小都是 1。0.7 节算过，这时 GPU 的算力只用到不到 1%。
+- 请求一个接一个地处理，每次批大小都是 1。[0.7 节](stage0/07-roofline.md)算过，这时 GPU 的算力只用到不到 1%。
 - 后来的请求要等前面的请求全部生成完。
 - 生成完才返回，用户要盯着空白页面等十几秒。
 
@@ -80,7 +80,7 @@ flowchart LR
 
 ## 4. 实现中的三个问题
 
-项目 1 的 `server.py` 实现了这套结构。写的时候有三个地方容易出错。
+[项目 1](stage1/boss-miniserve.md) 的 `server.py` 实现了这套结构。写的时候有三个地方容易出错。
 
 ### 4.1 跨线程投递 token
 
@@ -99,7 +99,7 @@ def _dispatch(self, out: StepOutput):
         self.streams.pop(out.seq.seq_id, None)
 ```
 
-`new_token_id` 为空的情况，对应的是 chunked prefill（1.2 节）：一个长 prompt 分几步算完，只有最后一步才产生 token。
+`new_token_id` 为空的情况，对应的是 chunked prefill（[1.2 节](stage1/02-continuous-batching.md)）：一个长 prompt 分几步算完，只有最后一步才产生 token。
 
 ### 4.2 空闲时不要空转
 
@@ -165,7 +165,7 @@ flowchart TB
 
 API 服务和推理引擎之间，以及服务和调用方之间，都用 OpenAI 兼容的 HTTP 接口。好处是推理引擎可以随时更换：今天用 vLLM，明天某个负载下 SGLang 更快，只要接口不变，上层的业务代码不需要改动。
 
-在单个副本内部，vLLM 把这一节的结构做得更彻底：API 服务、引擎核心（调度器）、GPU worker 分别运行在不同的**进程**里，通过 ZeroMQ 通信。这样分词、反分词和 HTTP 处理不会和调度抢 Python 的 GIL，CPU 侧的开销可以和 GPU 计算重叠起来（1.3 节、6.8 节）。MiniServe 为了简单，只用了两个线程。
+在单个副本内部，vLLM 把这一节的结构做得更彻底：API 服务、引擎核心（调度器）、GPU worker 分别运行在不同的**进程**里，通过 ZeroMQ 通信。这样分词、反分词和 HTTP 处理不会和调度抢 Python 的 GIL，CPU 侧的开销可以和 GPU 计算重叠起来（[1.3 节](stage1/03-paged-attention-vllm.md)、[6.8 节](stage6/08-async-scheduling.md)）。MiniServe 为了简单，只用了两个线程。
 
 ## 7. 离线批量推理
 

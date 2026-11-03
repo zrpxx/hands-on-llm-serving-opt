@@ -65,7 +65,7 @@ $$
 
 有了这些改动，论文中量化 1750 亿参数的 OPT-175B 只需要单张 A100 约 4 小时。
 
-完整的算法（项目 2 的 `gptq.py` 就是这样实现的）：
+完整的算法（[项目 2](stage2/boss-quant-arena.md) 的 `gptq.py` 就是这样实现的）：
 
 ```python
 H += damp * mean(diag(H)) * I
@@ -119,7 +119,7 @@ oneshot(
 
 输出头 `lm_head` 通常不量化，它对误差比较敏感，在大模型中所占的参数比例又不大。
 
-量化后的 checkpoint 中，权重存为 `qweight`（每 8 个 4 位数打包成一个 int32），另有每组的 `scales`、`qzeros`（非对称时），以及启用 act-order 时的 `g_idx`。vLLM 加载时会根据显卡自动选择 kernel，比如在 Ampere 和 Hopper 上用 Marlin（2.6 节）。
+量化后的 checkpoint 中，权重存为 `qweight`（每 8 个 4 位数打包成一个 int32），另有每组的 `scales`、`qzeros`（非对称时），以及启用 act-order 时的 `g_idx`。vLLM 加载时会根据显卡自动选择 kernel，比如在 Ampere 和 Hopper 上用 Marlin（[2.6 节](stage2/06-quant-kernels.md)）。
 
 ## 7. 实验：GPTQ 与 RTN
 

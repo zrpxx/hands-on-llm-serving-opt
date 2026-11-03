@@ -10,9 +10,9 @@
 
 最直接的做法是用同一系列的小模型作为草稿，比如用 Qwen3-0.6B 为 Qwen3-32B 起草。同一系列的模型共用分词器，预训练数据相近，接受率比较高。草稿模型还可以做更激进的量化，因为它出错了也有目标模型验证兜底。
 
-如果能做一些训练，从目标模型**蒸馏**出一个草稿模型（2.8 节）通常比直接拿现成的小模型更好，它模仿的就是目标模型自己的分布。
+如果能做一些训练，从目标模型**蒸馏**出一个草稿模型（[2.8 节](stage2/08-distillation-pruning.md)）通常比直接拿现成的小模型更好，它模仿的就是目标模型自己的分布。
 
-这种做法的难点在工程侧：要在同一组 GPU 上运行两个模型，各自有 KV Cache，各自需要调度；草稿模型虽小，但 $K$ 次串行的前向也有不小的开销，小模型的 decode 同样受限于 kernel 启动这类固定开销（3.3 节）。
+这种做法的难点在工程侧：要在同一组 GPU 上运行两个模型，各自有 KV Cache，各自需要调度；草稿模型虽小，但 $K$ 次串行的前向也有不小的开销，小模型的 decode 同样受限于 kernel 启动这类固定开销（[3.3 节](stage3/03-triton-kernels.md)）。
 
 ### 1.2 自起草：Medusa 与 EAGLE
 
@@ -31,7 +31,7 @@ EAGLE 的草稿头需要针对每个目标模型单独训练。常见的开源�
 
 DeepSeek-V3 在预训练时加入了**多 token 预测**（Multi-Token Prediction，MTP）的目标：主模型之外有一个额外的模块，预测再往后一个位置的 token。它本来是为了改善训练，但推理时正好可以作为草稿。DeepSeek 报告，第二个 token 的接受率在 85% 到 90% 之间，decode 的速度提高到约 1.8 倍。
 
-之后 GLM-4.5、Qwen3-Next 等模型也发布了 MTP 层。和 EAGLE 相比，MTP 是与模型一起预训练的，接受率更高，也不需要另外找草稿头。6.5 节会讨论 MTP 在大规模部署中的用法。
+之后 GLM-4.5、Qwen3-Next 等模型也发布了 MTP 层。和 EAGLE 相比，MTP 是与模型一起预训练的，接受率更高，也不需要另外找草稿头。[6.5 节](stage6/05-mtp-speculative.md)会讨论 MTP 在大规模部署中的用法。
 
 ### 1.4 n-gram
 
@@ -72,7 +72,7 @@ $K$ 是最重要的调节参数。几个经验：
 
 调参时最有用的依据是**每个位置的接受率**。vLLM 会在日志和监控指标中给出这项数据。比如 $K = 6$ 时各位置的接受率为 $[0.8, 0.7, 0.6, 0.5, 0.1, 0.02]$：第 5、6 个位置几乎从不被接受，却要付出同样的起草开销，就应该把 $K$ 降到 4。
 
-注意这些数字的含义：第 $i$ 个位置的接受率是"前 $i$ 个草稿全部被接受"的比例，因此一定是递减的。3.4 节的实验中，各位置的接受率是 0.49、0.28、0.12、0.05，第 3、4 个位置的收益已经很小了。
+注意这些数字的含义：第 $i$ 个位置的接受率是"前 $i$ 个草稿全部被接受"的比例，因此一定是递减的。[3.4 节](stage3/04-speculative-decoding.md)的实验中，各位置的接受率是 0.49、0.28、0.12、0.05，第 3、4 个位置的收益已经很小了。
 
 ## 4. 什么时候不该用
 
@@ -122,7 +122,7 @@ vllm serve Qwen/Qwen3-32B --max-model-len 2048 \
 
 ## 6. 实验：在 CPU 上调 K
 
-用 3.4 节的 `spec_demo.py`，可以观察 $K$ 和接受率的关系：
+用 [3.4 节](stage3/04-speculative-decoding.md)的 `spec_demo.py`，可以观察 $K$ 和接受率的关系：
 
 ```bash
 cd code/project3
@@ -131,7 +131,7 @@ FORGE_IMPL=solution python spec_demo.py --target /tmp/tiny-lm --draft /tmp/draft
 
 试着回答两个问题：
 
-1. 根据输出中各位置的接受率，用 3.4 节的公式算出最优的 $K$，和实测的"估算加速比"一列对比。
+1. 根据输出中各位置的接受率，用 [3.4 节](stage3/04-speculative-decoding.md)的公式算出最优的 $K$，和实测的"估算加速比"一列对比。
 2. 草稿模型如果更大（比如 2 层、隐藏维度 192），接受率会提高，$c$ 也会增大。重新训练一个草稿模型，看最优的 $K$ 和加速比怎样变化。
 
 ## 自测
@@ -142,6 +142,6 @@ FORGE_IMPL=solution python spec_demo.py --target /tmp/tiny-lm --draft /tmp/draft
 
 - Cai et al., [Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads](https://arxiv.org/abs/2401.10774), ICML 2024。
 - Li et al., [EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty](https://arxiv.org/abs/2401.15077), ICML 2024；[EAGLE-2](https://arxiv.org/abs/2406.16858), EMNLP 2024；[EAGLE-3](https://arxiv.org/abs/2503.01840), 2025。
-- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 2.2 节与第 5.4.3 节。
+- DeepSeek-AI, [DeepSeek-V3 Technical Report](https://arxiv.org/abs/2412.19437) 第 [2.2 节](stage2/02-gptq.md)与第 5.4.3 节。
 - Sadhukhan et al., [MagicDec: Breaking the Latency-Throughput Tradeoff for Long Context Generation with Speculative Decoding](https://arxiv.org/abs/2408.11049), ICLR 2025。
 - [vLLM 文档：Speculative Decoding](https://docs.vllm.ai/en/latest/features/spec_decode.html)。

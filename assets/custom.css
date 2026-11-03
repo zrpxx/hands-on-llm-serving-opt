@@ -41,7 +41,7 @@
   --font-head: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
   --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-  --measure: 760px;
+  --measure: 880px;
   --radius: 6px;
 
   /* docsify 主题变量 */
@@ -126,7 +126,7 @@ body.is-home .reading-progress { display: none; }
 .markdown-section {
   max-width: var(--measure);
   padding: 28px 44px 56px;
-  margin: 0 auto 0 clamp(16px, 5vw, 80px);
+  margin: 0 auto;
   color: var(--text);
   line-height: 1.88;
   letter-spacing: 0.012em;
@@ -383,7 +383,7 @@ body.close .content { left: 0; }
   font-size: 1.2rem;
   color: var(--ink);
 }
-.sidebar .search { border-bottom: 0; padding: 0 20px 8px; margin: 0; }
+.sidebar .search { border-bottom: 0; padding: 20px 20px 10px; margin: 0; }
 .sidebar .search .input-wrap { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); }
 .sidebar .search input {
   background: transparent; color: var(--ink); font-family: var(--font-body);
@@ -464,14 +464,16 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
 .app-nav {
   margin: 0;
   right: 0;
-  top: 0;
-  padding: 16px 32px 0 0;
+  top: 12px;
+  height: 31px;
+  padding: 0 32px 0 0;
   display: flex;
   align-items: center;
   gap: 4px;
   font-family: var(--font-body);
 }
-.app-nav > ul { display: inline-flex; margin: 0; }
+.app-nav > ul { display: inline-flex; align-items: center; height: 31px; margin: 0; padding: 0; }
+.app-nav > ul > li { display: flex; align-items: center; height: 31px; line-height: 1; }
 .app-nav li { margin: 0 6px; }
 .app-nav a, .app-nav li > p, .nav-gh {
   color: var(--ink-2) !important;
@@ -515,7 +517,7 @@ body.sticky .sidebar, body.sticky .sidebar-toggle { position: fixed; }
 /* ------------------------------------------------------------------ 页底 */
 .docsify-pagination-container {
   max-width: var(--measure);
-  margin: 2.2em auto 0 clamp(16px, 5vw, 80px);
+  margin: 2.2em auto 0;
   padding: 1.5em 44px 0;
   border-top: 1px solid var(--rule);
 }
@@ -817,7 +819,8 @@ body.is-home .sidebar .app-sub-sidebar { display: none !important; }
 }
 .kv-pool-title {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
+  min-width: 0;
   gap: 8px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -830,8 +833,10 @@ body.is-home .sidebar .app-sub-sidebar { display: none !important; }
   background: var(--prefill-soft);
   padding: 3px 6px;
   border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.kv-pool-ctrls { display: inline-flex; gap: 4px; }
+.kv-pool-ctrls { display: inline-flex; gap: 4px; flex-shrink: 0; }
 .kv-pool-btn {
   cursor: pointer;
   font: 500 0.72rem/1.2 var(--font-mono);
@@ -840,6 +845,7 @@ body.is-home .sidebar .app-sub-sidebar { display: none !important; }
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 3px 8px;
+  white-space: nowrap;
   transition: border-color 0.12s ease, color 0.12s ease;
 }
 .kv-pool-btn:hover { color: var(--ink); border-color: var(--rule-strong); }

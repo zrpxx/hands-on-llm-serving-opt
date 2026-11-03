@@ -2,9 +2,9 @@
 
 > 对应原书第 6 章 *Scalable Attention Mechanisms*。滑动窗口和混合注意力是书外内容。
 
-第 2 部分通过降低每个元素的位宽来省显存、减带宽；第 3 部分则从结构、算子与生成算法三个层面继续加速：减少需要缓存的 KV 元素数量（3.1 节）、消除显存中间读写与算子启动开销（3.2～3.3 节），以及用一次目标模型前向验证多个 token（3.4～3.5 节）。
+第 2 部分通过降低每个元素的位宽来省显存、减带宽；第 3 部分则从结构、算子与生成算法三个层面继续加速：减少需要缓存的 KV 元素数量（3.1 节）、消除显存中间读写与算子启动开销（3.2～[3.3 节](stage3/03-triton-kernels.md)），以及用一次目标模型前向验证多个 token（3.4～[3.5 节](stage3/05-spec-decoding-advanced.md)）。
 
-0.4 节说过，decode 阶段每生成一个 token，都要把这个请求全部的 KV Cache 从显存读一遍。KV Cache 越大，每一步读得越多，能同时运行的请求越少，能支持的上下文越短。因此，近几年的模型在结构上做了很多减小 KV Cache 的设计。这些设计是在训练时确定的，部署时没法改变，但它们决定了一个模型好不好部署，也决定了推理引擎需要什么样的 kernel。
+[0.4 节](stage0/04-kv-cache-prefill-decode.md)说过，decode 阶段每生成一个 token，都要把这个请求全部的 KV Cache 从显存读一遍。KV Cache 越大，每一步读得越多，能同时运行的请求越少，能支持的上下文越短。因此，近几年的模型在结构上做了很多减小 KV Cache 的设计。这些设计是在训练时确定的，部署时没法改变，但它们决定了一个模型好不好部署，也决定了推理引擎需要什么样的 kernel。
 
 这一节介绍四类设计：减少 KV 头的 MQA 和 GQA，压缩 KV 的 MLA，限制每层能看多远的滑动窗口，以及正在兴起的混合注意力。
 
@@ -25,7 +25,7 @@
 
 两者相等是 MHA，后者为 1 是 MQA，介于两者之间是 GQA。
 
-GQA 对推理的意义不只是省显存。decode 时，一组 K、V 被同组的几个查询头共用，读一次 KV 可以做几倍的计算，算术强度（0.7 节）提高了。好的注意力 kernel 会把同一组的查询头放在一起处理，充分利用这一点。项目 1 和项目 3 的 kernel 中，第 $h$ 个查询头读第 $h / (n_{\text{heads}} / n_{\text{kv}})$ 个 KV 头，就是 GQA 的实现。
+GQA 对推理的意义不只是省显存。decode 时，一组 K、V 被同组的几个查询头共用，读一次 KV 可以做几倍的计算，算术强度（[0.7 节](stage0/07-roofline.md)）提高了。好的注意力 kernel 会把同一组的查询头放在一起处理，充分利用这一点。[项目 1](stage1/boss-miniserve.md) 和项目 3 的 kernel 中，第 $h$ 个查询头读第 $h / (n_{\text{heads}} / n_{\text{kv}})$ 个 KV 头，就是 GQA 的实现。
 
 ## 2. MLA
 
@@ -45,7 +45,7 @@ $$
 q_h \cdot K_h^\top = q_h \left(c\, W^{UK}_h\right)^\top = \left(q_h W^{UK\top}_h\right) c^\top
 $$
 
-先把查询变换到 512 维的隐空间，再直接与缓存的 $c$ 计算分数；同理，对 $V_h = c\, W^{UV}_h$ 加权求和后再乘输出投影 $W^O_h$，也可以写成 $\left(\sum_t a_{h,t} c_t\right)\left(W^{UV}_h W^O_h\right)$，即把 $W^{UV}_h$ 吸收到输出投影中。这样，128 个查询头共用同一份 $c$，注意力的计算等价于一个 K、V 都是 512 维的 MQA。`code/stage3/mla_absorb.py` 验证了两种做法的结果相同：
+先把查询变换到 512 维的隐空间，再直接与缓存的 $c$ 计算分数；同理，对 $V_h = c\, W^{UV}_h$ 加权求和后再乘输出投影 $W^O_h$，也可以写成 $\left(\sum_t a_{h,t} c_t\right)\left(W^{UV}_h W^O_h\right)$，即把 $W^{UV}_h$ 吸收到输出投影中。这样，128 个查询头共用同一份 $c$，注意力的计算等价于一个 K、V 都是 512 维的 MQA。[`code/stage3/mla_absorb.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage3/mla_absorb.py) 验证了两种做法的结果相同：
 
 ```bash
 python code/stage3/mla_absorb.py
@@ -97,7 +97,7 @@ gpt-oss 还使用了 **attention sink**：每个头有一个可学习的偏置�
 
 ## 6. 对部署的影响
 
-- **结构决定了显存的需求。** 估算 KV Cache（0.6 节）时，要用 `num_key_value_heads`、MLA 的 `kv_lora_rank` 和 `qk_rope_head_dim`，以及滑动窗口的配置，不能简单地用隐藏维度计算。
+- **结构决定了显存的需求。** 估算 KV Cache（[0.6 节](stage0/06-memory-budget.md)）时，要用 `num_key_value_heads`、MLA 的 `kv_lora_rank` 和 `qk_rope_head_dim`，以及滑动窗口的配置，不能简单地用隐藏维度计算。
 - **结构决定了需要什么 kernel。** MLA 需要专门的 kernel（FlashMLA、FlashInfer 的 MLA kernel），滑动窗口需要支持窗口掩码，attention sink 需要 kernel 支持额外的分母项。新模型发布后，推理引擎往往要过一段时间才能高效地支持它，这是选型时要考虑的。
 - **结构影响并行方式。** MLA 只有一份隐向量，没有多个 KV 头可以在张量并行时切分，每张卡都要存完整的 KV Cache。DeepSeek 的部署因此对注意力部分用数据并行，第 4 部分会讨论。
 
@@ -109,6 +109,6 @@ gpt-oss 还使用了 **attention sink**：每个头有一个可学习的偏置�
 
 - Shazeer, [Fast Transformer Decoding: One Write-Head is All You Need](https://arxiv.org/abs/1911.02150), 2019。
 - Ainslie et al., [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245), EMNLP 2023。
-- DeepSeek-AI, [DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model](https://arxiv.org/abs/2405.04434), 2024，第 2.1 节 MLA。
+- DeepSeek-AI, [DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model](https://arxiv.org/abs/2405.04434), 2024，第 [2.1 节](stage2/01-quant-fundamentals.md) MLA。
 - Gemma Team, [Gemma 3 Technical Report](https://arxiv.org/abs/2503.19786), 2025。
 - Xiao et al., [Efficient Streaming Language Models with Attention Sinks](https://arxiv.org/abs/2309.17453), ICLR 2024。

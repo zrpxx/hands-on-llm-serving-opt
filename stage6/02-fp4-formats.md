@@ -2,7 +2,7 @@
 
 > 书外内容。原书第 5 章讨论了 INT8、INT4、FP8，提到 Blackwell 开始支持 FP4，但没有展开。本节的误差实验和格式对比是书外内容。
 
-2.4 节讲过，Hopper 的 FP8 Tensor Core 让 W8A8 成为数据中心推理的默认选择。Blackwell 又往下走了一步：Tensor Core 原生支持 **4 位浮点**，FP4 矩阵乘法的峰值算力是 FP8 的两倍。与 INT4 的 weight-only 量化（2.2、2.3 节）不同，这里权重和激活都是 4 位，乘法本身就在 4 位上完成，不需要先反量化。
+[2.4 节](stage2/04-activation-quant.md)讲过，Hopper 的 FP8 Tensor Core 让 W8A8 成为数据中心推理的默认选择。Blackwell 又往下走了一步：Tensor Core 原生支持 **4 位浮点**，FP4 矩阵乘法的峰值算力是 FP8 的两倍。与 INT4 的 weight-only 量化（[2.2](stage2/02-gptq.md)、[2.3](stage2/03-awq.md) 节）不同，这里权重和激活都是 4 位，乘法本身就在 4 位上完成，不需要先反量化。
 
 问题是 4 位太少了。一个 4 位编码只有 16 种比特组合（在符号-数值表示下，$+0$ 与 $-0$ 重合，实际只有 15 个不同的实数取值），直接把整个张量缩放到这十几个值上，误差无法接受。NVFP4 和 MXFP4 的答案相同：**很小的块，每块一个缩放因子**。区别在块有多大、缩放因子用什么格式。
 
@@ -33,7 +33,7 @@ NVFP4 用 E4M3 表示缩放因子，可以精确到 $a / 6$ 附近，几乎不�
 
 ## 3. 误差有多大
 
-`code/stage6/fp4_formats.py` 用 NumPy 模拟了这几种格式，在三种数据上比较信噪比（SQNR，越大越好）：
+[`code/stage6/fp4_formats.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage6/fp4_formats.py) 用 NumPy 模拟了这几种格式，在三种数据上比较信噪比（SQNR，越大越好）：
 
 ```bash
 python code/stage6/fp4_formats.py
@@ -54,7 +54,7 @@ python code/stage6/fp4_formats.py
 
 几个观察：
 
-- **块大小是主要因素**。同样是 INT4，每组 128 个和每组 16 个，在有离群值的激活上差了近 8 dB。这和 2.1 节分组量化的结论一致。
+- **块大小是主要因素**。同样是 INT4，每组 128 个和每组 16 个，在有离群值的激活上差了近 8 dB。这和 [2.1 节](stage2/01-quant-fundamentals.md)分组量化的结论一致。
 - **在正态分布上，E2M1 并不比 INT4 好**：同样每组 16 个，INT4 g16 的 SQNR 反而略高。E2M1 的优势在重尾和离群值的情况下才显现出来。
 - **NVFP4 的缩放因子更省**。INT4 g16 用 FP16 作缩放因子，每元素 5 位；NVFP4 用 FP8，每元素 4.5 位，误差相近甚至更好。
 - **MXFP4 因为 2 的幂的缩放，比同等条件下损失明显**。
@@ -69,14 +69,14 @@ FP4 的收益来自三个方面，对应推理的不同瓶颈：
 
 - **算力**：FP4 矩阵乘法的峰值是 FP8 的两倍，对 prefill 和大 batch 的 decode 有效。
 - **显存和带宽**：权重是 FP8 的一半，对小 batch 的 decode 有效，也让更大的模型能放进更少的卡。
-- **通信**：MoE 的 dispatch 前把激活量化成 FP4 再发送，all-to-all 的数据量是 BF16 的四分之一左右（6.3 节）。
+- **通信**：MoE 的 dispatch 前把激活量化成 FP4 再发送，all-to-all 的数据量是 BF16 的四分之一左右（[6.3 节](stage6/03-wide-ep-eplb.md)）。
 
-vLLM 在 GB200 上部署 DeepSeek-R1 时的做法很有代表性：MoE 专家的矩阵乘法和注意力的输出投影用 NVFP4；对量化更敏感的 MLA 的 Q 投影仍然用 FP8；MoE dispatch 前把激活量化到 FP4；把 RoPE、量化和写入 Q 融合成一个 kernel，省掉中间的读写。**哪些层用 FP4、哪些保留更高的精度**，是需要逐层评估的（2.7 节）。
+vLLM 在 GB200 上部署 DeepSeek-R1 时的做法很有代表性：MoE 专家的矩阵乘法和注意力的输出投影用 NVFP4；对量化更敏感的 MLA 的 Q 投影仍然用 FP8；MoE dispatch 前把激活量化到 FP4；把 RoPE、量化和写入 Q 融合成一个 kernel，省掉中间的读写。**哪些层用 FP4、哪些保留更高的精度**，是需要逐层评估的（[2.7 节](stage2/07-choosing-quantization.md)）。
 
 开源模型也开始直接以 4 位格式发布。OpenAI 的 gpt-oss 把 MoE 的权重以 MXFP4 发布；NVIDIA 为 DeepSeek-R1、Llama 等模型发布了 NVFP4 的版本。在没有 FP4 Tensor Core 的 Hopper 上，这些权重只能先反量化再计算，相当于 weight-only 量化，省显存但不省算力。
 
 > [!NOTE]
-> 量化后的误差最终要在任务上评估，SQNR 只是一个代理。NVFP4 的实际精度还取决于量化方法：只做简单的就近舍入（本节的模拟就是这样），还是配合 2.2、2.3 节的 GPTQ、AWQ 等方法，或者训练时就使用 FP4（量化感知训练、FP4 预训练）。
+> 量化后的误差最终要在任务上评估，SQNR 只是一个代理。NVFP4 的实际精度还取决于量化方法：只做简单的就近舍入（本节的模拟就是这样），还是配合 [2.2](stage2/02-gptq.md)、[2.3](stage2/03-awq.md) 节的 GPTQ、AWQ 等方法，或者训练时就使用 FP4（量化感知训练、FP4 预训练）。
 
 ## 5. 实验
 

@@ -9,7 +9,7 @@
 - **模型**（`model.py`）：RMSNorm、RoPE、GQA 注意力和 SwiGLU，KV Cache 按分页方式读写。支持 Llama、Qwen2、Qwen3 结构。贪心解码的输出与 Hugging Face 一致。
 - **调度器**（`scheduler.py`）：连续批处理，chunked prefill，显存不足时的重算式抢占。为了做对比实验，也保留了静态批处理和不切块两种模式。
 - **块管理与输入准备**（`kv_cache.py`、`engine.py`）：物理块的分配和释放，把一批序列展平成模型的输入。
-- **HTTP 服务**（`server.py`）：1.1 节的结构，后台线程运行引擎循环，每个请求一个队列，支持 SSE 流式输出。
+- **HTTP 服务**（`server.py`）：[1.1 节](stage1/01-serving-from-scratch.md)的结构，后台线程运行引擎循环，每个请求一个队列，支持 SSE 流式输出。
 
 前缀缓存没有包含在必做部分，可以作为完成后的扩展练习（见第 6 节）。
 
@@ -93,7 +93,7 @@ pytest -q tests
 
 - `input_ids`：这一步每一行的 token；
 - `positions`：每一行在自己序列中的位置，用于 RoPE；
-- `slot_mapping`：每一行的 K、V 写入哪个槽位（1.3 节的公式）；
+- `slot_mapping`：每一行的 K、V 写入哪个槽位（[1.3 节](stage1/03-paged-attention-vllm.md)的公式）；
 - `sample_rows`：哪些行要送进输出头采样。只有这一步之后已算长度追上总长度的序列，才采样它的最后一行。
 
 另外还要为注意力准备每个序列完整上下文的槽位，并区分 prefill 组和 decode 组，两组的注意力用不同的方式计算。
@@ -109,9 +109,9 @@ pytest -q tests
 **性能实验**（需要 GPU）：加载 Qwen3-0.6B 或 Qwen3-8B，用 `bench.py` 完成下面四组实验，把结果整理成一份简短的报告：
 
 1. **与基线和 vLLM 比较。** 输入 512、输出 128、并发 32，比较 `baseline_hf.py`、MiniServe 和 vLLM 的输出吞吐。MiniServe 应该明显快于逐个处理请求的基线。
-2. **并发扫描。** `--max-concurrency` 依次取 1、2、4、8、16、32、64，画出吞吐和 TPOT 随并发的变化，找到吞吐开始饱和的位置，并用 0.7 节的公式解释。
-3. **调度策略。** 在 GPU 上重复 1.2 节第 5 节的实验：静态批处理、不切块的连续批处理、两种预算下的 chunked prefill。
-4. **显存核对。** 用 0.6 节的 `estimate_memory.py` 估算 KV 块数，和 MiniServe 启动日志中的 `KV Cache：N 块 × 16 = … token` 对比，解释差异的来源。
+2. **并发扫描。** `--max-concurrency` 依次取 1、2、4、8、16、32、64，画出吞吐和 TPOT 随并发的变化，找到吞吐开始饱和的位置，并用 [0.7 节](stage0/07-roofline.md)的公式解释。
+3. **调度策略。** 在 GPU 上重复 [1.2 节](stage1/02-continuous-batching.md)第 5 节的实验：静态批处理、不切块的连续批处理、两种预算下的 chunked prefill。
+4. **显存核对。** 用 [0.6 节](stage0/06-memory-budget.md)的 `estimate_memory.py` 估算 KV 块数，和 MiniServe 启动日志中的 `KV Cache：N 块 × 16 = … token` 对比，解释差异的来源。
 
 指南的第 11 步给出了这些实验的具体命令。
 
@@ -121,7 +121,7 @@ pytest -q tests
 
 做完必做部分，可以选择下面的方向继续：
 
-- **前缀缓存。** 按 1.4 节 vLLM 的方式，为写满的块计算链式哈希，维护哈希到物理块的映射和引用计数，命中时直接设置 `num_computed_tokens`。注意抢占和释放时引用计数的处理。
+- **前缀缓存。** 按 [1.4 节](stage1/04-prefix-caching.md) vLLM 的方式，为写满的块计算链式哈希，维护哈希到物理块的映射和引用计数，命中时直接设置 `num_computed_tokens`。注意抢占和释放时引用计数的处理。
 - **CUDA Graph。** 对 decode 的固定批大小录制 CUDA Graph，减少 kernel 启动的开销，观察小模型上单步时间的变化。
 - **更好的抢占策略。** 现在总是抢占最晚加入的序列。试试按剩余输出长度、已等待时间等其他依据，比较 P99 延迟的变化。
 - **用 FlashInfer 或 FlashAttention 的分页 kernel 替换注意力。** 现在的注意力在 Python 里按序列循环，长上下文时很慢。

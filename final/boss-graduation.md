@@ -26,16 +26,16 @@
 
 不用任何工具，先用前几部分的公式估一遍。这一步的目的是建立预期，后面的模拟和实测要与它对照。
 
-- **显存**（0.6 节）：权重多大，每个 token 的 KV 多大，一张卡能放多少 token 的 KV。
-- **单步耗时**（0.7 节）：decode 一步的下限是多少，batch 多大时开始受算力限制。
-- **需要多少并发**（5.1 节，Little 定律）：峰值速率乘以每个请求的平均耗时，就是同时在途的请求数。它能放进 KV Cache 吗？
-- **前缀缓存能省多少**（1.4 节）：场景 A 和 C 中，命中率的理论上限是多少？
+- **显存**（[0.6 节](stage0/06-memory-budget.md)）：权重多大，每个 token 的 KV 多大，一张卡能放多少 token 的 KV。
+- **单步耗时**（[0.7 节](stage0/07-roofline.md)）：decode 一步的下限是多少，batch 多大时开始受算力限制。
+- **需要多少并发**（[5.1 节](final/01-optimization-playbook.md)，Little 定律）：峰值速率乘以每个请求的平均耗时，就是同时在途的请求数。它能放进 KV Cache 吗？
+- **前缀缓存能省多少**（[1.4 节](stage1/04-prefix-caching.md)）：场景 A 和 C 中，命中率的理论上限是多少？
 
 以场景 A 为例：Qwen3-8B 的 BF16 权重约 16 GB，每个 token 的 KV 约 144 KB，一张 H100 留给 KV 的显存能放 30 多万个 token。每个请求约 4.4K 输入、160 输出，如果每个请求耗时约 5 秒，峰值 48 请求/秒时同时在途约 240 个请求，KV 约 100 万个 token，不计前缀共享需要三四张卡。前缀命中时，4K 的公共部分只存一份，KV 的压力小得多，瓶颈转到算力上。
 
 ## 3. 第二步：用模拟器规划
 
-`code/graduation/plan.py` 在项目 4 的模拟器上搜索方案：实例数、权重精度（BF16 或 FP8）、路由策略（最少负载或缓存感知）、部署方式（聚合或 PD 分离）。对每个方案计算 goodput，找出满足目标、卡数最少的几个。
+[`code/graduation/plan.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/graduation/plan.py) 在项目 4 的模拟器上搜索方案：实例数、权重精度（BF16 或 FP8）、路由策略（最少负载或缓存感知）、部署方式（聚合或 PD 分离）。对每个方案计算 goodput，找出满足目标、卡数最少的几个。
 
 ```bash
 python code/graduation/plan.py                          # 场景 A 的默认参数
@@ -84,9 +84,9 @@ vllm bench serve --model Qwen/Qwen3-8B-FP8 --dataset-name prefix_repetition \
   --request-rate 16 --num-prompts 1000 --percentile-metrics ttft,tpot,itl --metric-percentiles 50,90,99
 ```
 
-多实例的路由可以用 SGLang Router 或 vLLM 的生产栈（4.6、4.8 节）。卡不够时，可以按比例缩小：用一张卡和 1/N 的请求速率验证单实例的行为，再由模拟器推算多实例的结果，并在报告中说明这一推算。
+多实例的路由可以用 SGLang Router 或 vLLM 的生产栈（[4.6](stage4/06-load-balancing-routing.md)、[4.8](stage4/08-enterprise-architecture.md) 节）。卡不够时，可以按比例缩小：用一张卡和 1/N 的请求速率验证单实例的行为，再由模拟器推算多实例的结果，并在报告中说明这一推算。
 
-质量也要验证：在业务评测集（或 GSM8K、MMLU 这类公开基准的一个子集）上比较 BF16 与 FP8 的分数（2.7 节）。
+质量也要验证：在业务评测集（或 GSM8K、MMLU 这类公开基准的一个子集）上比较 BF16 与 FP8 的分数（[2.7 节](stage2/07-choosing-quantization.md)）。
 
 **没有 GPU 时**，用项目 1 的 MiniServe 和一个小模型（Qwen3-0.6B，或项目 2 训练的小模型）在 CPU 上验证相对的结论：开关前缀缓存、改变 chunked prefill 的预算时，TTFT 和 ITL 的变化方向是否与模拟器一致。绝对数字不可比，变化的方向和大致的比例可以比。
 
@@ -101,7 +101,7 @@ vllm bench serve --model Qwen/Qwen3-8B-FP8 --dataset-name prefix_repetition \
 3. **估算**：第一步的手算，以及它预测的瓶颈。
 4. **备选方案与取舍**：模拟器的结果；被否决的方案以及否决的理由。
 5. **验证**：实测的数据、与模拟的对比、偏差的分析；量化前后的质量对比。
-6. **风险与预案**：流量超过峰值时会怎样（排队、降级、扩容需要多久，4.5 节的冷启动）；哪些假设如果不成立，方案需要修改。
+6. **风险与预案**：流量超过峰值时会怎样（排队、降级、扩容需要多久，[4.5 节](stage4/05-multi-model-serving.md)的冷启动）；哪些假设如果不成立，方案需要修改。
 7. **下一步**：还没有尝试、但可能有收益的优化（投机解码、FP4、更细的路由），以及验证它们需要什么。
 
 报告中的每一个结论都要有数字。"缓存感知路由效果更好"不是结论；"缓存感知路由把命中率从 0.62 提高到 0.79，TTFT P99 从 304 ms 降到 125 ms"才是。

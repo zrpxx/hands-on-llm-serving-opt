@@ -23,7 +23,7 @@ y = h * torch.rsqrt(var + eps) * weight
 组件揭示了两种情况：
 
 - **token 多的时候（prefill）**，收益来自读写量的减少。残差加 RMSNorm 的读写量减少到约 40%。
-- **token 少的时候（decode）**，数据量很小，每个 kernel 的固定开销反而是大头：CPU 发起调用、GPU 调度线程块、kernel 结束时的同步，加起来每个 kernel 要几微秒。一个 8B 模型每一步有几百个 kernel，光是这部分就有一两毫秒。融合减少了 kernel 的数量，3.6 节的 CUDA Graph 则把 CPU 端的启动开销一并去掉。
+- **token 少的时候（decode）**，数据量很小，每个 kernel 的固定开销反而是大头：CPU 发起调用、GPU 调度线程块、kernel 结束时的同步，加起来每个 kernel 要几微秒。一个 8B 模型每一步有几百个 kernel，光是这部分就有一两毫秒。融合减少了 kernel 的数量，[3.6 节](stage3/06-profiling.md)的 CUDA Graph 则把 CPU 端的启动开销一并去掉。
 
 ## 2. 谁来做融合
 
@@ -68,7 +68,7 @@ add_kernel[grid](x, y, out, n, BLOCK=1024)
 | `tl.constexpr` | 编译期常量，用于块大小、开关等；每个不同的值会编译出一个不同的 kernel |
 | `tl.dot` | 块与块的矩阵乘法，编译为 Tensor Core 指令 |
 
-再看一个归约的例子，项目 3 第 1 步的 RMSNorm。每个 program 处理一行，整行一次读入：
+再看一个归约的例子，[项目 3](stage3/boss-kernel-forge.md) 第 1 步的 RMSNorm。每个 program 处理一行，整行一次读入：
 
 ```python
 @triton.jit
@@ -133,7 +133,7 @@ vLLM 的 `fused_moe` 就是这样一个矩阵乘法 kernel：它把属于同一�
 
 ## 6. 其他选择
 
-Triton 之外，近两年还出现了一批写高性能 kernel 的工具：NVIDIA 的 CUTLASS 和 CuTe DSL（FlashAttention-4 就是用后者写的）、TileLang、ThunderKittens 等。它们给了比 Triton 更细的控制，适合追求极致性能的场景。6.9 节会做比较。
+Triton 之外，近两年还出现了一批写高性能 kernel 的工具：NVIDIA 的 CUTLASS 和 CuTe DSL（FlashAttention-4 就是用后者写的）、TileLang、ThunderKittens 等。它们给了比 Triton 更细的控制，适合追求极致性能的场景。[6.9 节](stage6/09-kernel-dsl.md)会做比较。
 
 ## 7. 实验
 
@@ -144,7 +144,7 @@ cd code/project3
 FORGE_IMPL=solution python -m pytest -q tests -k "step01 or step02"
 ```
 
-有 GPU 时，运行 `bench.py`，比较融合的 RMSNorm、SwiGLU 与 PyTorch 逐行实现的耗时，并计算有效带宽（读写的字节数除以耗时），和显卡的峰值带宽（0.5 节）比较。一个写得好的逐元素 kernel 应该能达到峰值带宽的 80% 以上。
+有 GPU 时，运行 `bench.py`，比较融合的 RMSNorm、SwiGLU 与 PyTorch 逐行实现的耗时，并计算有效带宽（读写的字节数除以耗时），和显卡的峰值带宽（[0.5 节](stage0/05-gpu-specs.md)）比较。一个写得好的逐元素 kernel 应该能达到峰值带宽的 80% 以上。
 
 ## 自测
 

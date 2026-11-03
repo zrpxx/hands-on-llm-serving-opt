@@ -1,6 +1,6 @@
 # 项目 3　Kernel Forge：用 Triton 写推理算子，实现投机解码
 
-> 前置：3.2～3.6 节。代码在 [`code/project3`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project3)。全部开发和正确性测试都可以在 CPU 上完成：没有 GPU 时，测试会自动用 Triton 的解释器运行 kernel。性能测试需要 NVIDIA GPU。
+> 前置：3.2～[3.6 节](stage3/06-profiling.md)。代码在 [`code/project3`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project3)。全部开发和正确性测试都可以在 CPU 上完成：没有 GPU 时，测试会自动用 Triton 的解释器运行 kernel。性能测试需要 NVIDIA GPU。
 
 这个项目有两部分。前五步用 Triton 写推理中最关键的几个算子：融合的 RMSNorm、SwiGLU、在线 softmax、FlashAttention 的前向，以及分页 KV Cache 上的 decode 注意力。最后一步用 PyTorch 实现投机解码的验证逻辑，在两个小模型上测量接受率。
 
@@ -54,7 +54,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 ### 第 1 步：RMSNorm
 
-每个 program 处理一行。3.3 节第 3 节给出了不带残差的版本，这里还要处理残差：`HAS_RES` 为真时，先把残差加到输入上，把相加的结果写到 `res_out_ptr`（下一层要用它作为残差），再对它做 RMSNorm。
+每个 program 处理一行。[3.3 节](stage3/03-triton-kernels.md)第 3 节给出了不带残差的版本，这里还要处理残差：`HAS_RES` 为真时，先把残差加到输入上，把相加的结果写到 `res_out_ptr`（下一层要用它作为残差），再对它做 RMSNorm。
 
 <details>
 <summary>提示：HAS_RES 是 constexpr</summary>
@@ -72,7 +72,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 ### 第 3 步：在线 softmax
 
-一行的长度可能远大于 BLOCK，所以要循环。第一遍循环维护 `m` 和 `l`，第二遍写出结果。3.2 节第 2 节给出了更新公式。
+一行的长度可能远大于 BLOCK，所以要循环。第一遍循环维护 `m` 和 `l`，第二遍写出结果。[3.2 节](stage3/02-flashattention.md)第 2 节给出了更新公式。
 
 <details>
 <summary>提示 1：越界位置填什么</summary>
@@ -94,7 +94,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 接口有两个要注意的地方：
 
-- **查询可以只是序列的最后 M 个位置**（M ≤ N）。chunked prefill（1.2 节）时，一个块的查询要看到之前所有的 KV。第 $i$ 个查询的绝对位置是 $N - M + i$，已经算好放在 `q_pos` 里。因果掩码的条件是 key 的位置 ≤ 查询的位置。
+- **查询可以只是序列的最后 M 个位置**（M ≤ N）。chunked prefill（[1.2 节](stage1/02-continuous-batching.md)）时，一个块的查询要看到之前所有的 KV。第 $i$ 个查询的绝对位置是 $N - M + i$，已经算好放在 `q_pos` 里。因果掩码的条件是 key 的位置 ≤ 查询的位置。
 - **GQA**：第 $h$ 个查询头读第 `h // GROUP` 个 KV 头，框架中的 `kvh` 已经算好。
 
 <details>
@@ -145,7 +145,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 
 `spec.py` 中的 `speculative_generate` 已经写好了外层的循环：起草、目标模型的一次前向、验证、统计。你要实现三个函数：
 
-- `rejection_sample`：3.4 节第 2.2 节的拒绝采样。
+- `rejection_sample`：[3.4 节](stage3/04-speculative-decoding.md)第 [2.2 节](stage2/02-gptq.md)的拒绝采样。
 - `greedy_verify`：贪心解码时的验证。
 - `ngram_propose`：在已有 token 中查找与结尾相同的 n-gram。
 
@@ -168,7 +168,7 @@ python -m pytest -q tests                        # 你的实现，现在全部�
 - n-gram 的查找结果；
 - 用两个随机的小模型做贪心的投机解码，输出与目标模型自己的贪心解码逐 token 一致，草稿模型和 n-gram 两种方式都要检查。
 
-通过之后，运行 3.4 节的 `spec_demo.py`。草稿模型要用项目 2 的训练脚本，复用目标模型的分词器：
+通过之后，运行 [3.4 节](stage3/04-speculative-decoding.md)的 `spec_demo.py`。草稿模型要用项目 2 的训练脚本，复用目标模型的分词器：
 
 ```bash
 python ../project2/tools/train_tiny_lm.py --data ../project2/data --out /tmp/draft-lm \
@@ -186,10 +186,10 @@ python bench.py
 
 它会用 Qwen3-8B 量级的形状测试每个 kernel，与 PyTorch 的实现比较耗时：
 
-- RMSNorm、SwiGLU、softmax、decode 注意力是带宽瓶颈，报告**有效带宽**，即"最少需要读写的字节数 ÷ 耗时"。和显卡的峰值带宽（0.5 节）比较，好的实现能达到 80% 以上。
+- RMSNorm、SwiGLU、softmax、decode 注意力是带宽瓶颈，报告**有效带宽**，即"最少需要读写的字节数 ÷ 耗时"。和显卡的峰值带宽（[0.5 节](stage0/05-gpu-specs.md)）比较，好的实现能达到 80% 以上。
 - FlashAttention 是计算瓶颈，报告 TFLOPS，和 PyTorch 的 `scaled_dot_product_attention` 比较。
 
-对每个 kernel，分析它距离硬件的上限还差多少，原因可能是什么。可以用 3.6 节的 Nsight Compute 验证你的猜测。
+对每个 kernel，分析它距离硬件的上限还差多少，原因可能是什么。可以用 [3.6 节](stage3/06-profiling.md)的 Nsight Compute 验证你的猜测。
 
 > [!NOTE]
 > 参考实现的正确性在 CPU 的解释器中验证过，`bench.py` 在发布前没有在 GPU 上运行过。如果在你的 GPU 上遇到编译错误或数值问题，那正好是第 7 步的一部分：记录下来，修好它。
@@ -197,15 +197,15 @@ python bench.py
 ## 4. 完成标准
 
 - `python -m pytest -q tests` 全部通过。
-- `spec_demo.py` 的结果表，并根据各位置的接受率，用 3.4 节的公式算出最优的 K，与实测对比。
+- `spec_demo.py` 的结果表，并根据各位置的接受率，用 [3.4 节](stage3/04-speculative-decoding.md)的公式算出最优的 K，与实测对比。
 - 有 GPU 时：`bench.py` 的结果，以及对每个 kernel 与硬件上限之间差距的分析。
 
 ## 5. 扩展练习
 
-- **FlashDecoding。** 给第 5 步的 kernel 加一个维度，把一个序列的 KV 切成若干段并行处理，再写一个合并的 kernel（3.2 节第 5 节的公式）。在 batch 小、上下文长时比较加速效果。
+- **FlashDecoding。** 给第 5 步的 kernel 加一个维度，把一个序列的 KV 切成若干段并行处理，再写一个合并的 kernel（[3.2 节](stage3/02-flashattention.md)第 5 节的公式）。在 batch 小、上下文长时比较加速效果。
 - **GQA 打包。** 让 decode kernel 的一个 program 同时处理同一组的所有查询头，把分数计算变成矩阵乘法，用上 `tl.dot`。
 - **自动调优。** 给 FlashAttention 加上 `@triton.autotune`，尝试不同的 BLOCK_M、BLOCK_N、`num_warps`、`num_stages`，看最优配置在不同序列长度下是否变化。
-- **融合量化。** 在 RMSNorm 的输出端直接做按 token 的 FP8 量化（2.4 节），输出 FP8 张量和每行的 scale。这是 vLLM 中真实存在的融合。
+- **融合量化。** 在 RMSNorm 的输出端直接做按 token 的 FP8 量化（[2.4 节](stage2/04-activation-quant.md)），输出 FP8 张量和每行的 scale。这是 vLLM 中真实存在的融合。
 - **树形验证。** 为 `speculative_generate` 实现一个最简单的树：第一个位置取草稿模型的前两个候选，各自往后起草，用树形注意力掩码一次验证两条路径。
 
 ## 自测

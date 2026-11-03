@@ -1,6 +1,6 @@
 # 项目 4　Cluster Commander：模拟一个推理集群
 
-> 前置：4.3、4.6 节，以及 1.2、1.4 节。代码在 [`code/project4`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project4)。只依赖 Python 标准库和 pytest，全部在 CPU 上运行，每组实验几秒钟。GPU 上的验证实验需要 2 张以上的卡。
+> 前置：[4.3](stage4/03-pd-disaggregation.md)、[4.6](stage4/06-load-balancing-routing.md) 节，以及 [1.2](stage1/02-continuous-batching.md)、[1.4](stage1/04-prefix-caching.md) 节。代码在 [`code/project4`](https://github.com/zrpxx/hands-on-llm-serving-opt/tree/main/code/project4)。只依赖 Python 标准库和 pytest，全部在 CPU 上运行，每组实验几秒钟。GPU 上的验证实验需要 2 张以上的卡。
 
 第 4 部分的很多结论，比如"缓存感知路由能降低 TTFT""PD 分离的配比很关键"，要在真实的集群上验证，需要好几张 GPU 和大量的调试。这个项目换一种方式：写一个推理集群的**离散事件模拟器**。每个实例按连续批处理和 chunked prefill 运行，有自己的前缀缓存，每一步的耗时用 Roofline 估算。在它上面实现几种路由策略和 PD 分离，几秒钟就能比较它们在不同负载下的表现。
 
@@ -78,7 +78,7 @@ CLUSTER_IMPL=solution python run.py routers        # 看一眼实验的输出
 
 测试检查三件事：同一个 key 总是映射到同一个实例；2000 个 key 在 4 个实例上的分布大致均匀；增加第 5 个实例后，只有约五分之一的 key 换了位置。最后一点是一致性哈希相对于"哈希值对实例数取模"的优势：后者增加一个实例，几乎所有的 key 都要换位置，所有缓存都会失效。
 
-**缓存感知。** 按 4.6 节描述的 SGLang 路由器的思路：负载明显失衡时按负载选；否则选命中最多的实例；哪里都命中不了多少时也按负载选。
+**缓存感知。** 按 [4.6 节](stage4/06-load-balancing-routing.md)描述的 SGLang 路由器的思路：负载明显失衡时按负载选；否则选命中最多的实例；哪里都命中不了多少时也按负载选。
 
 完成之后运行：
 
@@ -86,7 +86,7 @@ CLUSTER_IMPL=solution python run.py routers        # 看一眼实验的输出
 python run.py routers
 ```
 
-应该得到与 4.6 节第 3 小节相近的结果：两种按前缀的路由命中率约 0.83，轮询约 0.58；缓存感知的 TTFT P99 最低。
+应该得到与 [4.6 节](stage4/06-load-balancing-routing.md)第 3 小节相近的结果：两种按前缀的路由命中率约 0.83，轮询约 0.58；缓存感知的 TTFT P99 最低。
 
 ### 第 4 步：PD 分离
 
@@ -162,7 +162,7 @@ python run.py pd --link 5
 
 - **更准确的耗时模型。** 现在注意力只计入了读 KV 的时间。加上 prefill 时注意力的计算量（与长度的平方成正比），看长输入负载下 TTFT 的变化。
 - **基于 SLO 的路由。** 请求带上自己的 TTFT 目标，路由器估算每个实例上的排队时间，选一个能满足目标、且负载最高的实例（把余量留给后面的请求）。
-- **KV 卸载。** 给 `PrefixCache` 加一层 CPU 缓存：从显存淘汰的块进入 CPU 层，命中 CPU 层时按 4.4 节的带宽加上加载时间。
+- **KV 卸载。** 给 `PrefixCache` 加一层 CPU 缓存：从显存淘汰的块进入 CPU 层，命中 CPU 层时按 [4.4 节](stage4/04-advanced-kv-cache.md)的带宽加上加载时间。
 
 ## 自测
 

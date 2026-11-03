@@ -53,7 +53,7 @@ flowchart LR
 
 以 $s = 2000$、$n = 1000$ 为例：不用缓存相当于处理了约 250 万个 token，使用缓存只处理 3000 个，相差 800 多倍。
 
-代价是显存。每个 token 在每一层都要存一份 $k$ 和 $v$。Qwen3-8B 每个 token 的 KV Cache 是 144 KiB，一个 32K 长度的请求要 4.5 GB。0.6 节会推导这个数字，并计算一张卡能同时容纳多少请求。
+代价是显存。每个 token 在每一层都要存一份 $k$ 和 $v$。Qwen3-8B 每个 token 的 KV Cache 是 144 KiB，一个 32K 长度的请求要 4.5 GB。[0.6 节](stage0/06-memory-budget.md)会推导这个数字，并计算一张卡能同时容纳多少请求。
 
 ## 4. Prefill 与 Decode
 
@@ -80,13 +80,13 @@ flowchart LR
 | 瓶颈 | 算力 | 显存带宽 |
 | 决定的指标 | 首个 token 的延迟（TTFT） | 之后每个 token 的间隔（TPOT） |
 
-"瓶颈"一行是这一节最重要的结论，0.7 节会用 Roofline 模型定量地说明它。直观地看：prefill 读一遍权重，可以用在几千个 token 上；decode 读同样多的权重，只算一个 token，GPU 的大部分时间花在等数据。
+"瓶颈"一行是这一节最重要的结论，[0.7 节](stage0/07-roofline.md)会用 Roofline 模型定量地说明它。直观地看：prefill 读一遍权重，可以用在几千个 token 上；decode 读同样多的权重，只算一个 token，GPU 的大部分时间花在等数据。
 
 这张表也给后面的优化手段分了类：
 
-- 针对 prefill：前缀缓存，跳过重复的 prompt（1.4 节）；FlashAttention，降低长输入的注意力开销（3.2 节）；FP8 计算（2.4 节）。
-- 针对 decode：连续批处理，让多个请求共享一次权重读取（1.2 节）；权重量化与 KV Cache 量化，减少要读的字节（第 2 部分）；投机解码，一次验证多个 token（3.4 节）。
-- 两者互相干扰时：chunked prefill（1.2 节）、prefill 与 decode 分离部署（4.3 节）。
+- 针对 prefill：前缀缓存，跳过重复的 prompt（[1.4 节](stage1/04-prefix-caching.md)）；FlashAttention，降低长输入的注意力开销（[3.2 节](stage3/02-flashattention.md)）；FP8 计算（[2.4 节](stage2/04-activation-quant.md)）。
+- 针对 decode：连续批处理，让多个请求共享一次权重读取（[1.2 节](stage1/02-continuous-batching.md)）；权重量化与 KV Cache 量化，减少要读的字节（第 2 部分）；投机解码，一次验证多个 token（[3.4 节](stage3/04-speculative-decoding.md)）。
+- 两者互相干扰时：chunked prefill（[1.2 节](stage1/02-continuous-batching.md)）、prefill 与 decode 分离部署（[4.3 节](stage4/03-pd-disaggregation.md)）。
 
 不同业务的耗时分布也不一样。长输入、短输出的任务，比如文档摘要、RAG 问答、分类，时间主要花在 prefill；短输入、长输出的任务，比如对话、写作、带长思维链的推理，时间主要花在 decode。优化之前，先看清楚自己的负载属于哪一类。
 
@@ -124,16 +124,16 @@ with torch.no_grad():
 print(tok.decode(generated[0], skip_special_tokens=True))
 ```
 
-第 0 步是 prefill，处理整个 prompt，耗时稍长；之后每一步的耗时基本不变，不再随长度增长。在 A100 上运行 Qwen3-0.6B，decode 每步大约在 10 ms 量级。对一个 0.6B 的模型来说这其实很慢，大部分时间花在 Python 逐层调用和启动 GPU kernel 上，而不是计算本身。项目 1 会再次看到这一现象；消除这部分开销需要依靠算子融合、CUDA Graph（第 3 部分）和异步调度（6.8 节）。
+第 0 步是 prefill，处理整个 prompt，耗时稍长；之后每一步的耗时基本不变，不再随长度增长。在 A100 上运行 Qwen3-0.6B，decode 每步大约在 10 ms 量级。对一个 0.6B 的模型来说这其实很慢，大部分时间花在 Python 逐层调用和启动 GPU kernel 上，而不是计算本身。[项目 1](stage1/boss-miniserve.md) 会再次看到这一现象；消除这部分开销需要依靠算子融合、CUDA Graph（第 3 部分）和异步调度（[6.8 节](stage6/08-async-scheduling.md)）。
 
 ## 6. KV Cache 带来的新问题
 
 KV Cache 用显存换来了计算量的大幅下降，也带来了几个新问题。第 1 部分的内容基本就是围绕它们展开的：
 
-1. **占用显存多。** 长上下文、高并发时，KV Cache 往往比权重还大，直接限制了一张卡能同时服务的请求数（0.6 节）。
-2. **容易产生碎片。** 请求最终会生成多少个 token 事先不知道。如果按最大长度预留一块连续显存，大部分空间会闲置。分页管理解决这个问题（1.3 节）。
-3. **相同前缀被重复计算。** 一百个请求带着同一段系统提示词，这段提示词的 KV Cache 没必要算一百遍、存一百份（1.4 节）。
-4. **prefill 和 decode 互相干扰。** 一个长 prompt 的 prefill 和其他请求的 decode 放进同一步，会让那些请求的输出停顿一下（1.2 节）。
+1. **占用显存多。** 长上下文、高并发时，KV Cache 往往比权重还大，直接限制了一张卡能同时服务的请求数（[0.6 节](stage0/06-memory-budget.md)）。
+2. **容易产生碎片。** 请求最终会生成多少个 token 事先不知道。如果按最大长度预留一块连续显存，大部分空间会闲置。分页管理解决这个问题（[1.3 节](stage1/03-paged-attention-vllm.md)）。
+3. **相同前缀被重复计算。** 一百个请求带着同一段系统提示词，这段提示词的 KV Cache 没必要算一百遍、存一百份（[1.4 节](stage1/04-prefix-caching.md)）。
+4. **prefill 和 decode 互相干扰。** 一个长 prompt 的 prefill 和其他请求的 decode 放进同一步，会让那些请求的输出停顿一下（[1.2 节](stage1/02-continuous-batching.md)）。
 
 ## 7. 实验：手写循环、Transformers 与 vLLM
 

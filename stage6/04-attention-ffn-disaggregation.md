@@ -1,17 +1,17 @@
 # 6.4 Attention-FFN 分离
 
-> 书外内容。原书第 7 章介绍了 Prefill-Decode 分离（4.3 节）。本节讨论另一种分离：把一层中的 Attention 和 FFN（MoE）放到不同的卡上。算术强度的估算和流水线组件是书外内容。
+> 书外内容。原书第 7 章介绍了 Prefill-Decode 分离（[4.3 节](stage4/03-pd-disaggregation.md)）。本节讨论另一种分离：把一层中的 Attention 和 FFN（MoE）放到不同的卡上。算术强度的估算和流水线组件是书外内容。
 
 PD 分离按**阶段**拆分：prefill 和 decode 的计算特征不同，就放到不同的实例上。Attention-FFN 分离（AFD）按**算子**拆分：即使只看 decode，一层中的 Attention 和 FFN 的计算特征也截然不同。StepFun 的 Step-3 和字节跳动的 MegaScale-Infer 在 2025 年提出了这种做法，vLLM 在 2026 年 7 月发布了 AFD 插件。
 
 ## 1. 两种算子，两种瓶颈
 
-0.7 节的 Roofline 告诉我们，算子是受带宽还是算力限制，取决于它的算术强度（每读一个字节做多少次计算）。decode 时：
+[0.7 节](stage0/07-roofline.md)的 Roofline 告诉我们，算子是受带宽还是算力限制，取决于它的算术强度（每读一个字节做多少次计算）。decode 时：
 
 - **Attention**：每个请求读的是**自己的** KV Cache，batch 再大也不能复用。算术强度与 batch 无关，只取决于模型结构：GQA 约等于每组 KV 对应的 Q 头数，MLA 因为 128 个头共享同一份压缩的 KV，可以达到两百多。
 - **FFN / MoE**：所有请求共用同一份权重。每个专家分到的 token 越多，权重读一次被用得越充分，算术强度随 batch 线性增长。
 
-`code/stage6/afd_balance.py` 按 H800 的规格估算了两个模型的一层：
+[`code/stage6/afd_balance.py`](https://github.com/zrpxx/hands-on-llm-serving-opt/blob/main/code/stage6/afd_balance.py) 按 H800 的规格估算了两个模型的一层：
 
 ```bash
 python code/stage6/afd_balance.py
@@ -70,8 +70,8 @@ DeepSeek-V3
 
 | 分离方式 | 拆开的是 | 解决的问题 | 本教程 |
 |---|---|---|---|
-| PD 分离 | prefill 与 decode 两个阶段 | prefill 打断 decode，两者的最优并行方式不同 | 4.3 节 |
-| EPD 分离 | 多模态编码器、prefill、decode | 编码器的开销 | 5.4 节 |
+| PD 分离 | prefill 与 decode 两个阶段 | prefill 打断 decode，两者的最优并行方式不同 | [4.3 节](stage4/03-pd-disaggregation.md) |
+| EPD 分离 | 多模态编码器、prefill、decode | 编码器的开销 | [5.4 节](final/04-multimodal-serving.md) |
 | AFD | 一层中的 Attention 与 FFN | 两种算子的瓶颈不同，显存互相挤占 | 本节 |
 
 这几种可以组合：先做 PD 分离，再在 decode 实例内部做 AFD。
